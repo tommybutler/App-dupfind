@@ -106,6 +106,11 @@ sub weed_dups
          $size_dups => '_get_file_last_bytes' => ++$pass_count
       );
 
+   $size_dups = $self->_pull_weeds
+      (
+         $size_dups => '_get_file_middle_byte' => ++$pass_count
+      );
+
    $size_dups->{0} = $zero_sized if ref $zero_sized;
 
    return $size_dups;
@@ -119,6 +124,7 @@ sub _pull_weeds
    my ( $self, $size_dups, $weeder, $pass_count ) = @_;
 
    my $dup_count = 0;
+   my $len = 64;
 
    $dup_count += @$_ for map { $size_dups->{ $_ } } keys %$size_dups;
 
@@ -141,7 +147,7 @@ sub _pull_weeds
 
       for my $file ( @group )
       {
-         my $bytes_read = $self->$weeder( $file );
+         my $bytes_read = $self->$weeder( $file, $len, $same_size );
 
          push @{ $same_bytes->{ $bytes_read } }, $file
             if defined $bytes_read;
@@ -173,7 +179,7 @@ sub _pull_weeds
 
 sub _get_file_first_bytes
 {
-   my ( $self, $file, $len ) = @_;
+   my ( $self, $file, $len, $size ) = @_;
 
    my $buff;
 
@@ -192,7 +198,7 @@ sub _get_file_first_bytes
 
 sub _get_file_last_bytes
 {
-   my ( $self, $file, $len ) = @_;
+   my ( $self, $file, $len, $size ) = @_;
 
    my $buff;
 
@@ -202,7 +208,30 @@ sub _get_file_last_bytes
 
    return unless defined $fh;
 
-   sysseek $fh, $len - $len, 0;
+   sysseek $fh, $size - $len, 0;
+
+   sysread $fh, $buff, $len;
+
+   close $fh or return;
+
+   return $buff;
+}
+
+sub _get_file_middle_byte
+{
+   my ( $self, $file, $len, $size ) = @_;
+
+   my $buff;
+
+   $len = 1;
+
+   my $pos = int $size / 2;
+
+   sysopen my $fh, $file, 0 or warn $!;
+
+   return unless defined $fh;
+
+   sysseek $fh, $pos, 0;
 
    sysread $fh, $buff, $len;
 
