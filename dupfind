@@ -7,13 +7,12 @@ use 5.010;
 
 BEGIN { $|++ }
 
-use File::Util;
-use Digest::xxHash 'xxhash_hex';
 use Getopt::Long;
-use Term::Prompt 'prompt';
-use Term::ProgressBar;
-use Time::HiRes 'usleep';
 use Benchmark ':hireswallclock';
+
+use lib 'lib';
+use File::DupFind;
+use File::DupFind::Threaded;
 
 my $opts =
 {
@@ -24,8 +23,10 @@ my $opts =
    prompt   => 0,
    remove   => 0,
    links    => 0,
+   threads  => 0,
    format   => 'human', # formatting options are either "human" or "robot"
    weed     => 1,
+   qsize    => 30,
 };
 
 GetOptions
@@ -36,27 +37,22 @@ GetOptions
    'links|l'      => \$opts->{links},
    'prompt|p'     => \$opts->{prompt},
    'remove|x'     => \$opts->{remove},
-   'delete'       => \$opts->{remove}, # <-- that's not a typo
    'help|h|?'     => \$opts->{help},
+   'threads|t=i'  => \$opts->{threads},
    'format|f=s'   => \$opts->{format},
    'weed|w=s'     => \$opts->{weed},
+   'qsize|q=i'    => \$opts->{qsize},
 ) or die usage();
 
 die usage() unless defined $opts->{dir};
 
-$opts->{remove}++ if $opts->{prompt};
-$opts->{weed} = 0 if $opts->{weed} =~ /^(n|no)$/i;
+$opts->{remove}++  if $opts->{prompt};
+$opts->{threads} //= 0;
+$opts->{weed}      = 0 if $opts->{weed} =~ /^(n|no)$/i;
 
-my $ftl = File::Util->new
-(
-   {
-      use_flock   => 0,
-      diag        => 1,
-      read_limit  => $opts->{bytes},
-      abort_depth => $opts->{maxdepth},
-      onfail      => 'undefined',
-   }
-);
+my $fdf = $opts->{threads}
+   ? File::DupFind::Threaded->new( opts => $opts )
+   : File::DupFind->new( opts => $opts );
 
 my $benchmarks =
 {
@@ -72,7 +68,7 @@ my ( $scan_count, $size_dup_count, $dup_count ) = run();
 
 say <<__SUMMARY__;
 ------------------------------
-** THREADS...............No threading
+** THREADS...............$opts->{threads}
 ** TOTAL FILES SCANNED...$scan_count
 ** TOTAL SAME SIZE.......$size_dup_count
 ** TOTAL ACTUAL DUPES....$dup_count
@@ -88,24 +84,23 @@ __SUMMARY__
 exit;
 
 
-
 sub run
 {
    bench_this( run => 'start' );
 
    my ( $size_dups, $scan_count, $size_dup_count ) = scanfs();
 
-   $size_dups = prune_hardlinks( $size_dups );
+   $size_dups = prune( $size_dups );
 
-   $size_dups = weed_out( $size_dups );
+   $size_dups = weed( $size_dups );
 
-   my $digest_dups = digest_the_rest( $size_dups );
+   my $digest_dups = digest( $size_dups );
 
    undef $size_dups; # free up some RAM
 
    say '** DISPLAYING OUTPUT'; say '-' x 30;
 
-   my $dup_count = show_dups( $digest_dups );
+   my $dup_count = $fdf->show_dups( $digest_dups );
 
    delete_dups( $digest_dups ) if $opts->{remove};
 
@@ -118,11 +113,11 @@ sub run
 
 sub scanfs
 {
-   bench_this( scanfs => 'start' );
-
    say '** SCANNING ALL FILES FOR SIZE DUPLICATES';
 
-   my ( $size_dups, $scan_count, $size_dup_count ) = get_size_dups();
+   bench_this( scanfs => 'start' );
+
+   my ( $size_dups, $scan_count, $size_dup_count ) = $fdf->get_size_dups();
 
    bench_this( scanfs => 'end' );
 
@@ -131,7 +126,7 @@ sub scanfs
    return $size_dups, $scan_count, $size_dup_count;
 }
 
-sub prune_hardlinks
+sub prune
 {
    my $size_dups = shift;
 
@@ -139,7 +134,7 @@ sub prune_hardlinks
 
    bench_this( prune => 'start' );
 
-   $size_dups = toss_out_hardlinks( $size_dups );
+   $size_dups = $fdf->toss_out_hardlinks( $size_dups );
 
    bench_this( prune => 'end' );
 
@@ -148,7 +143,7 @@ sub prune_hardlinks
    return $size_dups;
 }
 
-sub weed_out
+sub weed
 {
    my $size_dups = shift;
 
@@ -156,7 +151,7 @@ sub weed_out
 
    bench_this( weed => 'start' );
 
-   $size_dups = remove_obviously_different( $size_dups );
+   $size_dups = $fdf->weed_dups( $size_dups );
 
    bench_this( weed => 'end' );
 
@@ -165,7 +160,7 @@ sub weed_out
    return $size_dups;
 }
 
-sub digest_the_rest
+sub digest
 {
    my $size_dups = shift;
 
@@ -173,7 +168,7 @@ sub digest_the_rest
 
    bench_this( digest => 'start' );
 
-   my $digest_dups = get_dup_digests( $size_dups );
+   my $digest_dups = $fdf->get_dup_digests( $size_dups );
 
    bench_this( digest => 'end' );
 
@@ -182,348 +177,13 @@ sub digest_the_rest
    return $digest_dups;
 }
 
-sub remove_obviously_different
-{
-   # weed out files that are obviously different, based on the last
-   # few bytes in the file.  This saves us from unnecessary hashing
-
-   my $size_dups    = shift;
-   my $zero_sized   = delete $size_dups->{0};
-   my $dup_count    = 0;
-
-   $dup_count += @$_ for map { $size_dups->{ $_ } } keys %$size_dups;
-
-   my $progress_bar = Term::ProgressBar->new
-      (
-         {
-            name   => '   ...FIRST PASS',
-            count  => $dup_count,
-            remove => 1,
-         }
-      );
-
-   my $i = 0;
-
-   for my $same_size ( keys %$size_dups )
-   {
-      my @group = sort { $a cmp $b } @{ $size_dups->{ $same_size } };
-
-      my $same_first_bytes = {};
-
-      for my $file ( @group )
-      {
-         my $first_bytes = get_file_first_bytes( $file => $same_size );
-
-         push @{ $same_first_bytes->{ $first_bytes } }, $file;
-
-         $progress_bar->update( $i++ );
-      }
-
-      # delete obvious non-dupe files from the group of same-size files
-      # by virtue of the fact that they will be a single length arrayref
-
-      delete $same_first_bytes->{ $_ }
-         for grep { @{ $same_first_bytes->{ $_ } } == 1 }
-         keys %$same_first_bytes;
-
-      # recompose the arrayref of filenames for the same-size file grouping
-      # but leave out the files we just weeded out from the group
-
-      $size_dups->{ $same_size } = []; # start fresh
-
-      push @{ $size_dups->{ $same_size } },
-         map { @{ $same_first_bytes->{ $_ } } }
-         keys %$same_first_bytes;
-   }
-
-   $progress_bar->update( $i );
-
-   undef $dup_count;
-
-   $dup_count += @$_ for map { $size_dups->{ $_ } } keys %$size_dups;
-
-   $i = 0; # reset
-
-   $progress_bar = Term::ProgressBar->new
-      (
-         {
-            name   => '   ...SECOND PASS',
-            count  => $dup_count,
-            remove => 1,
-         }
-      );
-
-   for my $same_size ( keys %$size_dups )
-   {
-      my @group = @{ $size_dups->{ $same_size } };
-
-      my $same_last_bytes = {};
-
-      for my $file ( @group )
-      {
-         my $last_bytes = get_file_last_bytes( $file => $same_size );
-
-         push @{ $same_last_bytes->{ $last_bytes } }, $file;
-
-         $progress_bar->update( $i++ );
-      }
-
-      # delete obvious non-dupe files from the group of same-size files
-      # by virtue of the fact that they will be a single length arrayref
-
-      delete $same_last_bytes->{ $_ }
-         for grep { @{ $same_last_bytes->{ $_ } } == 1 }
-         keys %$same_last_bytes;
-
-      # recompose the arrayref of filenames for the same-size file grouping
-      # but leave out the files we just weeded out from the group
-
-      $size_dups->{ $same_size } = []; # start fresh
-
-      push @{ $size_dups->{ $same_size } },
-         map { @{ $same_last_bytes->{ $_ } } }
-         keys %$same_last_bytes;
-   }
-
-   $progress_bar->update( $i );
-
-   $size_dups->{0} = $zero_sized if ref $zero_sized;
-
-   return $size_dups;
-}
-
-sub get_file_first_bytes
-{
-   my ( $file, $len ) = @_;
-
-   my $buff;
-
-   sysopen my $fh, $file, 0;
-
-   return unless defined $fh;
-
-   sysread $fh, $buff, 64;
-
-   close $fh or return;
-
-   return $buff;
-}
-
-sub get_file_last_bytes
-{
-   my ( $file, $len ) = @_;
-
-   my $buff;
-
-   sysopen my $fh, $file, 0;
-
-   return unless defined $fh;
-
-   sysseek $fh, $len - 1024, 0;
-
-   sysread $fh, $buff, 1024;
-
-   close $fh or return;
-
-   return $buff;
-}
-
-sub toss_out_hardlinks
-{
-   my $size_dups = shift;
-
-   for my $size ( keys %$size_dups )
-   {
-      my $group = $size_dups->{ $size };
-      my %dev_inodes;
-
-      # this will automatically throw out hardlinks, with the only surviving
-      # file being the first asciibetically-sorted entry
-      $dev_inodes{ join '', ( stat $_ )[0,1] } = $_ for reverse sort @$group;
-
-      if ( scalar keys %dev_inodes == 1 )
-      {
-         delete $size_dups->{ $size };
-      }
-      else
-      {
-         $size_dups->{ $size } = [ values %dev_inodes ];
-      }
-   }
-
-   return $size_dups;
-}
-
-sub get_size_dups
-{
-   my ( $size_dups, $scan_count, $size_dup_count ) = ( {}, 0, 0 );
-
-   $ftl->list_dir
-   (
-      $opts->{dir} =>
-      {
-         recurse => 1,
-         callback => sub
-            {
-               my ( $selfdir, $subdirs, $files ) = @_;
-
-               $scan_count += @$files;
-
-               push @{ $size_dups->{ -s $_ } }, $_
-                  for grep { !-l $_ && defined -s $_ } @$files;
-            }
-      }
-   );
-
-   delete $size_dups->{ $_ }
-      for grep { @{ $size_dups->{ $_ } } == 1 }
-      keys %$size_dups;
-
-   $size_dup_count += @$_ for map { $size_dups->{ $_ } } keys %$size_dups;
-
-   return $size_dups, $scan_count, $size_dup_count;
-}
-
-sub get_dup_digests
-{
-   my $size_dups = shift;
-   my $digests   = {};
-   my $dup_count = 0;
-   my $prgs_iter = 0;
-
-   $dup_count += @$_ for map { $size_dups->{ $_ } } keys %$size_dups;
-
-   my $progress  = Term::ProgressBar->new
-      (
-         {
-            name   => '   ...PROGRESS',
-            count  => $dup_count,
-            remove => 1,
-         }
-      );
-
-   local $/;
-
-   for my $size ( keys %$size_dups )
-   {
-      my $group = $size_dups->{ $size };
-
-      for my $file ( @$group )
-      {
-         open my $fh, '<', $file or next;
-
-         my $data = <$fh>;
-
-         close $fh;
-
-         my $digest = xxhash_hex $data, 0;
-
-         push @{ $digests->{ $digest } }, $file;
-
-         $progress->update( $prgs_iter++ );
-      }
-   }
-
-   delete $digests->{ $_ }
-      for grep { @{ $digests->{ $_ } } == 1 }
-      keys %$digests;
-
-   my $priv_digests = {};
-
-   # sort dup groupings
-   for my $digest ( keys %$digests )
-   {
-      my @group = @{ $digests->{ $digest } };
-
-      $priv_digests->{ $digest } = [ sort { $a cmp $b } @group ];
-   }
-
-   $progress->update( $dup_count );
-
-   undef $digests;
-
-   return $priv_digests;
-}
-
-sub show_dups
-{
-   my $digests = shift;
-   my $dupes  = 0;
-
-   my $for_humans = sub # human-readable output
-   {
-      my ( $digest, $files ) = @_;
-
-      say sprintf 'DUPLICATES (digest: %s | size: %db)', $digest, -s $$files[0];
-
-      say "   $_" for @$files;
-
-      say '';
-   };
-
-   my $for_robots = sub # machine parseable output
-   {
-      my ( $digest, $files ) = @_;
-
-      say join "\t", @$files
-   };
-
-   my $formatter = $opts->{format} eq 'human' ? $for_humans : $for_robots;
-
-   for my $digest
-   (
-      sort { $digests->{ $a }->[0] cmp $digests->{ $b }->[0] } keys %$digests
-   )
-   {
-      my $files = $digests->{ $digest };
-
-      $formatter->( $digest => $files );
-
-      $dupes += @$files - 1;
-   }
-
-   return $dupes
-}
-
 sub delete_dups
 {
    my $digests = shift;
 
    bench_this( remove => 'start' );
 
-   my $removed = 0;
-
-   for my $digest ( keys %$digests )
-   {
-      my $group = $digests->{ $digest };
-
-      say sprintf 'KEPT    (%s) %s', $digest, $group->[0];
-
-      shift @$group;
-
-      for my $dup ( @$group )
-      {
-         if ( $opts->{prompt} )
-         {
-            unless ( prompt 'y', "REMOVE DUPLICATE? $dup", '', 'n' )
-            {
-               say sprintf 'KEPT    (%s) %s', $digest, $dup;
-
-               next;
-            }
-         }
-
-         unlink $dup or warn "COULD NOT REMOVE $dup!  $!" and next;
-
-         $removed++;
-
-         say sprintf 'REMOVED (%s) %s', $digest, $dup;
-      }
-
-      say '--';
-   }
-
-   say "** TOTAL DUPLICATE FILES REMOVED: $removed";
+   $fdf->delete_dups( $digests );
 
    bench_this( remove => 'end' );
 }
@@ -560,7 +220,7 @@ USAGE:
    dupfind [ --options ] --dir ./path/to/search/
 
 EXAMPLE:
-   dupfind --format robot --maxdepth 100 --bytes 1099511627776 --dir /dedup
+   dupfind --threads 4 --format robot --maxdepth 100 --bytes 1099511627776 --dir /dedup
 
 DESCRIPTION:
    finds duplicate files in a directory tree.  Options are explained
@@ -593,9 +253,18 @@ ARGUMENTS AND FLAGS:
 
    -p, --prompt   Interactively prompt user to delete detected duplicates
 
-   -x, --remove   Delete (WITHOUT PROMPTING) all but the first copy if
-                  duplicate files are found.  This will leave you with no
+   -q, --qsize    Number of files each thread should process at a time. The
+                  the default is 30.
+
+   -x, --remove   CAUTION: Delete WITHOUT PROMPTING all but the first copy
+                  if duplicate files are found.  This will leave you with no
                   duplicate files when execution is finished.
+
+   -t, --threads  Number of threads to use for file comparisons.  Defaults
+                  to 10, but lower numbers will do better on systems with
+                  fewer cores.  You'll usually get best performance using a
+                  number of threads equal to the number of logical processors
+                  on your system, plus 1.
 
    -w, --weed     Either yes or no.  (Default yes).  Tries to avoid unnecessary
                   file hashing by weeding out potential duplicates with a

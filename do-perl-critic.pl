@@ -13,9 +13,11 @@ die "Usage: $0 file.pl" unless defined $perl_file;
 
 my $violation_score = 0;
 
-for my $severity ( 1 .. 5 ) {
+for my $severity ( 1 .. 5 )
+{
     my $critic = Perl::Critic->new( -severity => $severity );
-    $violation_score += scalar( $critic->critique($perl_file) );
+
+    $violation_score += scalar( $critic->critique( $perl_file ) );
 }
 
 say "Violation score: $violation_score";
