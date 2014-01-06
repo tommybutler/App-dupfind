@@ -5,25 +5,22 @@ package File::DupFind::Threaded;
 
 use 5.010;
 
-use Moose;
-
-extends 'File::DupFind';
-
 BEGIN { $|++; $SIG{TERM} = $SIG{INT} = \&end_wait_thread_pool; }
 
 use threads;
 use threads::shared;
+
+use Moose; extends 'File::DupFind';
+
 use Thread::Queue;
 use Time::HiRes 'usleep';
 use Digest::xxHash 'xxhash_hex';
 
-my $digests = &share( {} ); # shared between threads, so we put this right up top
-my $d_counter :shared = 0;
-
-my $pool_queue     = Thread::Queue->new;
-my $worker_queues  = {};
-my $thread_term    :shared = 0;
-my $threads_init   :shared = 0;
+my $work_queue    = Thread::Queue->new;
+my $digests       = &share( {} );
+my $d_counter     :shared = 0;
+my $thread_term   :shared = 0;
+my $threads_init  :shared = 0;
 
 sub get_dup_digests
 {
@@ -46,30 +43,16 @@ sub get_dup_digests
    # creates thread pool, passing in as an argument the number of files
    # that the pool needs to digest.  this is NOT equivalent to the number
    # of threads to be created; that is determined in the options ($opts)
+
    $self->create_thread_pool( $dup_count );
 
-   sub get_tid
-   {
-      my $tid = $pool_queue->dequeue;
-
-      return $tid;
-   }
-
-   my $tid = get_tid();
-
-   SIZESCAN: for my $size ( keys %$size_dups )
+   for my $size ( keys %$size_dups )
    {
       my $group = $size_dups->{ $size };
 
       for my $file ( @$group )
       {
-         $worker_queues->{ $tid }->enqueue( $file ) if !$thread_term;
-
-         $queued++;
-
-         $tid = get_tid() and $queued = 0 if $queued == $self->opts->{qsize} - 1;
-
-         last SIZESCAN unless defined $tid;
+         $work_queue->enqueue( $file ) if !$thread_term;
       }
    }
 
@@ -110,11 +93,7 @@ sub create_thread_pool
 
    for ( 1 .. $self->opts->{threads} )
    {
-      my $thread_queue  = Thread::Queue->new;
-
-      my $worker_thread = threads->create( worker => $thread_queue );
-
-      $worker_queues->{ $worker_thread->tid } = $thread_queue;
+      threads->create( 'worker' );
    }
 
    lock $threads_init; $threads_init++;
@@ -129,9 +108,7 @@ sub end_wait_thread_pool
 
    $thread_term++;
 
-   $worker_queues->{ $_ }->end for keys %$worker_queues;
-
-   $pool_queue->end;
+   $work_queue->end;
 
    $_->join for threads->list;
 }
@@ -164,23 +141,12 @@ sub threads_progress
 
 sub worker
 {
-   my $work_queue = shift;
    my $tid = threads->tid;
 
    local $/;
 
-   WORKER: while ( !$thread_term )
+   WORKER: while ( !$thread_term && defined ( my $file = $work_queue->dequeue ) )
    {
-      # signal to the thread poolq that we are ready to work
-
-      $pool_queue->enqueue( $tid );
-
-      # wait for some filename to be put into my work queue
-
-      my $file = $work_queue->dequeue;
-
-      last unless defined $file;
-
       open my $fh, '<', $file or do { lock $d_counter; $d_counter++; next WORKER };
 
       my $data = <$fh>;
@@ -194,8 +160,6 @@ sub worker
       $digests->{ $digest } ||= &share( [] );
 
       push @{ $digests->{ $digest } }, $file;
-
-      #warn "$tid incrementing d_counter ($d_counter) for $file !!";
 
       lock $d_counter; $d_counter++;
    }
