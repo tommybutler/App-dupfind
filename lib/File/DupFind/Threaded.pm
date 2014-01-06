@@ -5,164 +5,153 @@ package File::DupFind::Threaded;
 
 use 5.010;
 
-BEGIN { $|++; $SIG{TERM} = $SIG{INT} = \&end_wait_thread_pool; }
+BEGIN { $|++; $SIG{TERM} = $SIG{INT} = \&kill_thread_pool; }
 
 use threads;
 use threads::shared;
 
-use Moose; extends 'File::DupFind';
+our $counter   :shared = 0;
+our $term_flag :shared = 0;
+our $init_flag :shared = 0;
+our $mapped    = &share( {} );
+
+use Moose;
 
 use Thread::Queue;
 use Time::HiRes 'usleep';
-use Digest::xxHash 'xxhash_hex';
 
-my $work_queue    = Thread::Queue->new;
-my $digests       = &share( {} );
-my $d_counter     :shared = 0;
-my $thread_term   :shared = 0;
-my $threads_init  :shared = 0;
+use lib 'lib';
 
-sub get_dup_digests
+extends 'File::DupFind';
+
+has work_queue => ( is => 'rw', default => sub { Thread::Queue->new } );
+
+sub mapped { $mapped }
+
+sub counter { $counter }
+
+sub reset_all
 {
-   my ( $self, $size_dups ) = @_;
-   my $dup_count = 0;
-   my $queued    = 0;
+   my $self = shift;
 
-   # you have to do this for this threaded version of dupfind, and it has
-   # to happen after you've already pruned out the hardlinks
-   {
-      # don't bother to hash zero-size files
-      $digests->{ xxhash_hex '', 0 } = &shared_clone( $size_dups->{0} )
-         if exists $size_dups->{0};
+   $self->reset_queue;
 
-      delete $size_dups->{0};
-   }
+   $self->clear_counter;
 
-   $dup_count += @$_ for map { $size_dups->{ $_ } } keys %$size_dups;
+   $self->reset_mapped;
 
-   # creates thread pool, passing in as an argument the number of files
-   # that the pool needs to digest.  this is NOT equivalent to the number
-   # of threads to be created; that is determined in the options ($opts)
+   $self->init_flag( 0 );
 
-   $self->create_thread_pool( $dup_count );
+   $self->term_flag( 0 );
+}
 
-   for my $size ( keys %$size_dups )
-   {
-      my $group = $size_dups->{ $size };
+sub reset_queue { shift->work_queue( Thread::Queue->new ) };
 
-      for my $file ( @$group )
-      {
-         $work_queue->enqueue( $file ) if !$thread_term;
-      }
-   }
+sub clear_counter { lock $counter; $counter = 0; return $counter; }
 
-   # wait for threads to finish
-   while ( $d_counter < $dup_count )
-   {
-      usleep 1000; # sleep for 1 millisecond
-   }
+sub reset_mapped { $mapped = &share( {} ); $mapped; }
 
-   # ...tell the threads to exit
-   end_wait_thread_pool();
+sub increment_counter { lock $counter; return ++$counter; }
 
-   # get rid of non-dupes
-   delete $digests->{ $_ }
-      for grep { @{ $digests->{ $_ } } == 1 }
-      keys %$digests;
+sub term_flag
+{
+   shift;
 
-   my $priv_digests = {};
+   if ( @_ ) { lock $term_flag; $term_flag = shift; }
 
-   # sort dup groupings
-   for my $digest ( keys %$digests )
-   {
-      my @group = @{ $digests->{ $digest } };
+   return $term_flag
+}
 
-      $priv_digests->{ $digest } = [ sort { $a cmp $b } @group ];
-   }
+sub init_flag
+{
+   shift;
 
-   undef $digests;
+   if ( @_ ) { lock $init_flag; $init_flag = shift; }
 
-   return $priv_digests;
+   return $init_flag
+}
+
+sub push_mapped
+{
+   my ( $self, $key, @vals ) = @_;
+
+   lock $mapped;
+
+   $mapped->{ $key } ||= &share( [] );
+
+   push @{ $mapped->{ $key } }, @vals;
+
+   return $mapped;
+}
+
+sub delete_mapped
+{
+   my ( $self, @keys ) = @_;
+
+   lock $mapped;
+
+   delete $mapped->{ $_ } for @keys;
+
+   return $mapped;
 }
 
 sub create_thread_pool
 {
-   my ( $self, $files_to_digest ) = @_;
+   my ( $self, $map_code, $dup_count ) = @_;
 
-   threads->create( threads_progress => $files_to_digest );
+   threads->create( sub { $self->threads_progress( $dup_count ) } );
 
    for ( 1 .. $self->opts->{threads} )
    {
-      threads->create( 'worker' );
+      # $map coderef is responsible for calling $self->increment_counter!
+
+      threads->create( $map_code );
    }
 
-   lock $threads_init; $threads_init++;
+   $self->init_flag( 1 );
 }
 
 sub end_wait_thread_pool
 {
-   # this is not an object method like its create_thread_pool counterpart;
-   # it has to be callable from the SIG handlers (at top of this file)
+   my $self = shift;
 
-   exit unless $threads_init;
+   $self->term_flag( 1 );
 
-   $thread_term++;
-
-   $work_queue->end;
+   $self->work_queue->end;
 
    $_->join for threads->list;
 }
 
+sub kill_thread_pool { $_->kill for threads->list }
+
 sub threads_progress
 {
-   my $files_to_digest  = shift;
-   my $last_update      = 0;
+   my ( $self, $task_item_count ) = @_;
+
+   my $last_update = 0;
+
    my $threads_progress = Term::ProgressBar->new
       (
          {
             name   => '   ...PROGRESS',
-            count  => $files_to_digest,
+            count  => $task_item_count,
             remove => 1,
          }
       );
 
-   while ( !$thread_term )
+   while ( !$self->term_flag )
    {
       usleep 1000; # sleep for 1 millisecond
 
-      $threads_progress->update( $d_counter )
-         if $d_counter > $last_update;
+      $threads_progress->update( $self->counter )
+         if $self->counter > $last_update;
 
-      $last_update = $d_counter;
+      last if $self->counter == $task_item_count;
+
+      $last_update = $self->counter;
    }
 
-   $threads_progress->update( $files_to_digest );
-}
-
-sub worker
-{
-   my $tid = threads->tid;
-
-   local $/;
-
-   WORKER: while ( !$thread_term && defined ( my $file = $work_queue->dequeue ) )
-   {
-      open my $fh, '<', $file or do { lock $d_counter; $d_counter++; next WORKER };
-
-      my $data = <$fh>;
-
-      close $fh;
-
-      my $digest = xxhash_hex $data, 0;
-
-      lock $digests;
-
-      $digests->{ $digest } ||= &share( [] );
-
-      push @{ $digests->{ $digest } }, $file;
-
-      lock $d_counter; $d_counter++;
-   }
+   $threads_progress->update( $task_item_count );
 }
 
 __PACKAGE__->meta->make_immutable;

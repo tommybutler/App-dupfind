@@ -30,22 +30,102 @@ sub _build_ftl
    );
 }
 
+sub get_size_dups
+{
+   my $self = shift;
+
+   my ( $size_dups, $scan_count, $size_dup_count ) = ( {}, 0, 0 );
+
+   $self->ftl->list_dir
+   (
+      $self->opts->{dir} =>
+      {
+         recurse => 1,
+         callback => sub
+            {
+               my ( $selfdir, $subdirs, $files ) = @_;
+
+               $scan_count += @$files;
+
+               push @{ $size_dups->{ -s $_ } }, $_
+                  for grep { !-l $_ && defined -s $_ } @$files;
+            }
+      }
+   );
+
+   delete $size_dups->{ $_ }
+      for grep { @{ $size_dups->{ $_ } } == 1 }
+      keys %$size_dups;
+
+   $size_dup_count += @$_ for map { $size_dups->{ $_ } } keys %$size_dups;
+
+   return $size_dups, $scan_count, $size_dup_count;
+}
+
+sub toss_out_hardlinks
+{
+   my ( $self, $size_dups ) = @_;
+
+   for my $size ( keys %$size_dups )
+   {
+      my $group = $size_dups->{ $size };
+      my %dev_inodes;
+
+      # this will automatically throw out hardlinks, with the only surviving
+      # file being the first asciibetically-sorted entry
+      $dev_inodes{ join '', ( stat $_ )[0,1] } = $_ for reverse sort @$group;
+
+      if ( scalar keys %dev_inodes == 1 )
+      {
+         delete $size_dups->{ $size };
+      }
+      else
+      {
+         $size_dups->{ $size } = [ values %dev_inodes ];
+      }
+   }
+
+   return $size_dups;
+}
+
 sub weed_dups
+{
+   my ( $self, $size_dups ) = @_;
+
+   my $zero_sized = delete $size_dups->{0};
+
+   my $pass_count = 0;
+
+   $size_dups = $self->_pull_weeds
+      (
+         $size_dups => '_get_file_first_bytes' => ++$pass_count
+      );
+
+   $size_dups = $self->_pull_weeds
+      (
+         $size_dups => '_get_file_last_bytes' => ++$pass_count
+      );
+
+   $size_dups->{0} = $zero_sized if ref $zero_sized;
+
+   return $size_dups;
+}
+
+sub _pull_weeds
 {
    # weed out files that are obviously different, based on the last
    # few bytes in the file.  This saves us from unnecessary hashing
 
-   my ( $self, $size_dups ) = @_;
+   my ( $self, $size_dups, $weeder, $pass_count ) = @_;
 
-   my $zero_sized   = delete $size_dups->{0};
-   my $dup_count    = 0;
+   my $dup_count = 0;
 
    $dup_count += @$_ for map { $size_dups->{ $_ } } keys %$size_dups;
 
    my $progress_bar = Term::ProgressBar->new
       (
          {
-            name   => '   ...FIRST PASS',
+            name   => '   ...WEED-OUT PASS ' . $pass_count,
             count  => $dup_count,
             remove => 1,
          }
@@ -57,13 +137,14 @@ sub weed_dups
    {
       my @group = sort { $a cmp $b } @{ $size_dups->{ $same_size } };
 
-      my $same_first_bytes = {};
+      my $same_bytes = {};
 
       for my $file ( @group )
       {
-         my $first_bytes = $self->_get_file_first_bytes( $file => $same_size );
+         my $bytes_read = $self->$weeder( $file );
 
-         push @{ $same_first_bytes->{ $first_bytes } }, $file;
+         push @{ $same_bytes->{ $bytes_read } }, $file
+            if defined $bytes_read;
 
          $progress_bar->update( $i++ );
       }
@@ -71,9 +152,9 @@ sub weed_dups
       # delete obvious non-dupe files from the group of same-size files
       # by virtue of the fact that they will be a single length arrayref
 
-      delete $same_first_bytes->{ $_ }
-         for grep { @{ $same_first_bytes->{ $_ } } == 1 }
-         keys %$same_first_bytes;
+      delete $same_bytes->{ $_ }
+         for grep { @{ $same_bytes->{ $_ } } == 1 }
+         keys %$same_bytes;
 
       # recompose the arrayref of filenames for the same-size file grouping
       # but leave out the files we just weeded out from the group
@@ -81,62 +162,11 @@ sub weed_dups
       $size_dups->{ $same_size } = []; # start fresh
 
       push @{ $size_dups->{ $same_size } },
-         map { @{ $same_first_bytes->{ $_ } } }
-         keys %$same_first_bytes;
+         map { @{ $same_bytes->{ $_ } } }
+         keys %$same_bytes;
    }
 
    $progress_bar->update( $i );
-
-   undef $dup_count;
-
-   $dup_count += @$_ for map { $size_dups->{ $_ } } keys %$size_dups;
-
-   $i = 0; # reset
-
-   $progress_bar = Term::ProgressBar->new
-      (
-         {
-            name   => '   ...SECOND PASS',
-            count  => $dup_count,
-            remove => 1,
-         }
-      );
-
-   for my $same_size ( keys %$size_dups )
-   {
-      my @group = @{ $size_dups->{ $same_size } };
-
-      my $same_last_bytes = {};
-
-      for my $file ( @group )
-      {
-         my $last_bytes = $self->_get_file_last_bytes( $file => $same_size );
-
-         push @{ $same_last_bytes->{ $last_bytes } }, $file;
-
-         $progress_bar->update( $i++ );
-      }
-
-      # delete obvious non-dupe files from the group of same-size files
-      # by virtue of the fact that they will be a single length arrayref
-
-      delete $same_last_bytes->{ $_ }
-         for grep { @{ $same_last_bytes->{ $_ } } == 1 }
-         keys %$same_last_bytes;
-
-      # recompose the arrayref of filenames for the same-size file grouping
-      # but leave out the files we just weeded out from the group
-
-      $size_dups->{ $same_size } = []; # start fresh
-
-      push @{ $size_dups->{ $same_size } },
-         map { @{ $same_last_bytes->{ $_ } } }
-         keys %$same_last_bytes;
-   }
-
-   $progress_bar->update( $i );
-
-   $size_dups->{0} = $zero_sized if ref $zero_sized;
 
    return $size_dups;
 }
@@ -181,65 +211,7 @@ sub _get_file_last_bytes
    return $buff;
 }
 
-sub toss_out_hardlinks
-{
-   my ( $self, $size_dups ) = @_;
-
-   for my $size ( keys %$size_dups )
-   {
-      my $group = $size_dups->{ $size };
-      my %dev_inodes;
-
-      # this will automatically throw out hardlinks, with the only surviving
-      # file being the first asciibetically-sorted entry
-      $dev_inodes{ join '', ( stat $_ )[0,1] } = $_ for reverse sort @$group;
-
-      if ( scalar keys %dev_inodes == 1 )
-      {
-         delete $size_dups->{ $size };
-      }
-      else
-      {
-         $size_dups->{ $size } = [ values %dev_inodes ];
-      }
-   }
-
-   return $size_dups;
-}
-
-sub get_size_dups
-{
-   my $self = shift;
-
-   my ( $size_dups, $scan_count, $size_dup_count ) = ( {}, 0, 0 );
-
-   $self->ftl->list_dir
-   (
-      $self->opts->{dir} =>
-      {
-         recurse => 1,
-         callback => sub
-            {
-               my ( $selfdir, $subdirs, $files ) = @_;
-
-               $scan_count += @$files;
-
-               push @{ $size_dups->{ -s $_ } }, $_
-                  for grep { !-l $_ && defined -s $_ } @$files;
-            }
-      }
-   );
-
-   delete $size_dups->{ $_ }
-      for grep { @{ $size_dups->{ $_ } } == 1 }
-      keys %$size_dups;
-
-   $size_dup_count += @$_ for map { $size_dups->{ $_ } } keys %$size_dups;
-
-   return $size_dups, $scan_count, $size_dup_count;
-}
-
-sub get_dup_digests
+sub digest_dups
 {
    my ( $self, $size_dups ) = @_;
    my $digests   = {};

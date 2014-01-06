@@ -5,14 +5,16 @@ use warnings;
 
 use 5.010;
 
-BEGIN { $|++ }
+BEGIN { STDERR->autoflush(1); STDOUT->autoflush(1); }
 
 use Getopt::Long;
 use Benchmark ':hireswallclock';
 
 use lib 'lib';
 use File::DupFind;
-use File::DupFind::Threaded;
+use File::DupFind::Threaded::AllTasks;
+
+use subs 'say_stderr';
 
 my $opts =
 {
@@ -51,7 +53,7 @@ $opts->{threads} //= 0;
 $opts->{weed}      = 0 if $opts->{weed} =~ /^(n|no)$/i;
 
 my $fdf = $opts->{threads}
-   ? File::DupFind::Threaded->new( opts => $opts )
+   ? File::DupFind::Threaded::AllTasks->new( opts => $opts )
    : File::DupFind->new( opts => $opts );
 
 my $benchmarks =
@@ -83,7 +85,6 @@ __SUMMARY__
 
 exit;
 
-
 sub run
 {
    bench_this( run => 'start' );
@@ -98,7 +99,7 @@ sub run
 
    undef $size_dups; # free up some RAM
 
-   say '** DISPLAYING OUTPUT'; say '-' x 30;
+   say_stderr '** DISPLAYING OUTPUT'; say '-' x 30;
 
    my $dup_count = $fdf->show_dups( $digest_dups );
 
@@ -113,7 +114,7 @@ sub run
 
 sub scanfs
 {
-   say '** SCANNING ALL FILES FOR SIZE DUPLICATES';
+   say_stderr '** SCANNING ALL FILES FOR SIZE DUPLICATES';
 
    bench_this( scanfs => 'start' );
 
@@ -130,7 +131,7 @@ sub prune
 {
    my $size_dups = shift;
 
-   say '** PRUNING HARD LINKS';
+   say_stderr '** PRUNING HARD LINKS';
 
    bench_this( prune => 'start' );
 
@@ -138,7 +139,7 @@ sub prune
 
    bench_this( prune => 'end' );
 
-   say '** NO DUPLICATES FOUND' and exit unless keys %$size_dups;
+   say_stderr '** NO DUPLICATES FOUND' and exit unless keys %$size_dups;
 
    return $size_dups;
 }
@@ -147,7 +148,7 @@ sub weed
 {
    my $size_dups = shift;
 
-   say '** WEEDING-OUT FILES THAT ARE OBVIOUSLY DIFFERENT';
+   say_stderr '** WEEDING-OUT FILES THAT ARE OBVIOUSLY DIFFERENT';
 
    bench_this( weed => 'start' );
 
@@ -155,7 +156,7 @@ sub weed
 
    bench_this( weed => 'end' );
 
-   say '** NO DUPLICATES FOUND' and exit unless keys %$size_dups;
+   say_stderr '** NO DUPLICATES FOUND' and exit unless keys %$size_dups;
 
    return $size_dups;
 }
@@ -164,15 +165,15 @@ sub digest
 {
    my $size_dups = shift;
 
-   say '** CHECKSUMMING SIZE DUPLICATES';
+   say_stderr '** CHECKSUMMING SIZE DUPLICATES';
 
    bench_this( digest => 'start' );
 
-   my $digest_dups = $fdf->get_dup_digests( $size_dups );
+   my $digest_dups = $fdf->digest_dups( $size_dups );
 
    bench_this( digest => 'end' );
 
-   say '** NO DUPLICATES FOUND' and exit unless keys %$digest_dups;
+   say_stderr '** NO DUPLICATES FOUND' and exit unless keys %$digest_dups;
 
    return $digest_dups;
 }
@@ -212,6 +213,8 @@ sub calculate_bench_times
    $benchmarks->{weed}->{result}   ||= 'did not weed';
    $benchmarks->{remove}->{result} ||= 'no deletions';
 }
+
+sub say_stderr { warn "$_\n" for @_ };
 
 # This is just the help message:
 
