@@ -68,7 +68,7 @@ my $benchmarks =
 
 my ( $scan_count, $size_dup_count, $dup_count ) = run();
 
-say <<__SUMMARY__;
+say_stderr <<__SUMMARY__;
 ------------------------------
 ** THREADS...............$opts->{threads}
 ** TOTAL FILES SCANNED...$scan_count
