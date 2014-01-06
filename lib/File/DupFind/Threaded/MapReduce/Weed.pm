@@ -31,6 +31,10 @@ sub weed_dups
 
       $reduced     = $self->map_reduce( $reduced => $map_code );
 
+      $map_code    = sub { $self->_weed_worker( '_get_file_middle_byte' ) };
+
+      $reduced     = $self->map_reduce( $reduced => $map_code );
+
    $size_dups->{0} = $zero_files if ref $zero_files;
 
    return $reduced;
@@ -52,17 +56,17 @@ sub _weed_worker
 
       next unless !! @$grouping; # why?
 
+      my $file_size = -s $grouping->[0];
+
       GROUPING: for my $file ( @$grouping )
       {
-         my $bytes_read = $self->$weeder( $file );
+         my $bytes_read = $self->$weeder( $file, 64, $file_size );
 
          $self->increment_counter;
 
          push @{ $same_bytes->{ $bytes_read } }, $file
             if defined $bytes_read;
       }
-
-      my $file_size = -s $grouping->[0];
 
       # delete obvious non-dupe files from the group of same-size files
       # by virtue of the fact that they will be a single length arrayref
