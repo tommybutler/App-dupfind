@@ -387,27 +387,32 @@ sub digest_dups
       for grep { @{ $digests->{ $_ } } == 1 }
       keys %$digests;
 
-   my $priv_digests = {};
-
-   # sort dup groupings
-   for my $digest ( keys %$digests )
-   {
-      my @group = @{ $digests->{ $digest } };
-
-      $priv_digests->{ $digest } = [ sort { $a cmp $b } @group ];
-   }
-
    $progress->update( $dup_count );
 
-   undef $digests;
-
-   return $priv_digests;
+   return $digests;
 }
 
-sub show_dups
+sub sort_dups
+{
+   my ( $self, $dups ) = @_;
+
+   # sort dup groupings
+   for my $identifier ( keys %$dups )
+   {
+      my @group = @{ $dups->{ $identifier } };
+
+      $dups->{ $identifier } = [ sort { $a cmp $b } @group ];
+   }
+
+   return $dups;
+}
+
+sub show_dups # also calls $self->sort_dups before displaying output
 {
    my ( $self, $digests ) = @_;
    my $dupes = 0;
+
+   $digests = $self->sort_dups( $digests );
 
    my $for_humans = sub # human-readable output
    {

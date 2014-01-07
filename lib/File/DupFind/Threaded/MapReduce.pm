@@ -70,20 +70,7 @@ sub reducer
       for grep { @{ $self->mapped->{ $_ } } == 1 }
       keys %{ $self->mapped };
 
-   my $reduced = {};
-
-   # sort dup groupings
-   for my $identifier ( keys %{ $self->mapped } )
-   {
-      my @group = @{ $self->mapped->{ $identifier } };
-
-      $reduced->{ $identifier } = [ sort { $a cmp $b } @group ];
-   }
-
-   # free up the RAM used by the mapped shared hashref
-   $self->reset_mapped;
-
-   return $reduced;
+   return $self->mapped;
 }
 
 __PACKAGE__->meta->make_immutable;

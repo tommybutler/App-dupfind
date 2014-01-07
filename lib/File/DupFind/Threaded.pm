@@ -30,6 +30,21 @@ sub mapped { $mapped }
 
 sub counter { $counter }
 
+override sort_dups => sub
+{
+   my ( $self, $dups ) = @_;
+
+   # sort dup groupings
+   for my $identifier ( keys %$dups )
+   {
+      my @group = @{ $dups->{ $identifier } };
+
+      $dups->{ $identifier } = &shared_clone( [ sort { $a cmp $b } @group ] );
+   }
+
+   return $dups;
+};
+
 sub reset_all
 {
    my $self = shift;
