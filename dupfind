@@ -28,6 +28,7 @@ my $opts =
    threads  => 0,
    format   => 'human', # formatting options are either "human" or "robot"
    weed     => 1,
+   wpass    => [ ],
    qsize    => 30,
 };
 
@@ -43,14 +44,18 @@ GetOptions
    'threads|t=i'  => \$opts->{threads},
    'format|f=s'   => \$opts->{format},
    'weed|w=s'     => \$opts->{weed},
+   'wpass=s'      => $opts->{wpass},
    'qsize|q=i'    => \$opts->{qsize},
-) or die usage();
+) or exit usage();
 
-die usage() unless defined $opts->{dir};
+exit usage() unless defined $opts->{dir};
 
-$opts->{remove}++  if $opts->{prompt};
 $opts->{threads} //= 0;
+$opts->{remove}    = 1 if $opts->{prompt};
 $opts->{weed}      = 0 if $opts->{weed} =~ /^(n|no)$/i;
+$opts->{weed}      = 1 if !! @{ $opts->{wpass} };
+$opts->{wpass}     = [ 'first_middle_last' ]
+   if $opts->{weed} && ! @{ $opts->{wpass} };
 
 my $fdf = $opts->{threads}
    ? File::DupFind::Threaded::AllTasks->new( opts => $opts )
@@ -93,7 +98,7 @@ sub run
 
    $size_dups = prune( $size_dups );
 
-   $size_dups = weed( $size_dups );
+   $size_dups = weed( $size_dups ) if $opts->{weed};
 
    my $digest_dups = digest( $size_dups );
 
@@ -218,7 +223,7 @@ sub say_stderr { warn "$_\n" for @_ };
 
 # This is just the help message:
 
-sub usage { <<'__USAGE__' }
+sub usage { say_stderr <<'__USAGE__' }
 USAGE:
    dupfind [ --options ] --dir ./path/to/search/
 
@@ -242,17 +247,17 @@ ARGUMENTS AND FLAGS:
 
    -d, --dir      Name of the directory you want to search for duplicates
 
-   -f, --format   Specify either "human" or "robot".  Human-readable output
-                  is generated for easy viewing by default.  If you want output
+   -f, --format   Specify either "human" or "robot".  Human-readable output is
+                  generated for easy viewing by default.  If you want output
                   that is machine-parseable, specify "robot"
 
 *  -l, --links    Follow symlinks (by default it does not).  Because this
                   has some safety implications and is a complex matter,
                   it is not yet supported.  Sorry, check back later.
 
-   -m, --maxdepth The maximum directory depth to which the comparison
-                  scan will recurse.  Note that this does not mean the
-                  total number of directories to scan.
+   -m, --maxdepth The maximum directory depth to which the comparison scan will
+                  recurse.  Note that this does not mean the total number of
+                  directories to scan.
 
    -p, --prompt   Interactively prompt user to delete detected duplicates
 
@@ -275,4 +280,22 @@ ARGUMENTS AND FLAGS:
                   same-size files.  This typically produces very significant
                   performance gains, especially with large numbers of files.
 
+   --wpass        One or more of the following "weeding" pass filters can be
+                  specified.  Weed-out passes reduce the amount of
+                  cryptographic digest calculations that must happen by
+                  weeding out potential-duplicates:
+
+                              first   (checks first few bytes of each file)
+                             middle   (checks the center-most single byte)
+                               last   (checks the last few bytes of files)
+                        middle_last   (checks middle byte and last few bytes)
+                  first_middle_last   (first bytes, middle byte, last bytes)
+
+                  The default is to only run the "first_middle_last" weed-out
+                  filter pass, which usually yields the best results in terms
+                  of speed.
+
+                  Weed-out filters are executed in the order you specify.
+
+                  Example usage: dupfind --wpass first --wpass last [...]
 __USAGE__

@@ -21,30 +21,40 @@ sub weed_dups
    # you have to do this for this threaded version of dupfind, and it has
    # to happen after you've already pruned out the hardlinks
 
-   my $zero_files  = delete $size_dups->{0};
+   my $zero_files = delete $size_dups->{0};
 
-   my $map_code    = sub { $self->_weed_worker( '_get_file_first_bytes' ) };
+   my $dup_count  = $self->count_dups( $size_dups );
 
-   my $reduced     = $self->map_reduce( $size_dups => $map_code );
+   my ( $map_code, $pass_count, $new_count, $diff );
 
-      $map_code    = sub { $self->_weed_worker( '_get_file_last_bytes' ) };
+   for my $planned_pass ( $self->_plan_weed_passes )
+   {
+      $pass_count++;
 
-      $reduced     = $self->map_reduce( $reduced => $map_code );
+      $self->say_stderr( "** $dup_count POTENTIAL DUPLICATES" );
 
-      $map_code    = sub { $self->_weed_worker( '_get_file_middle_byte' ) };
+      $map_code  = sub { $self->_weed_worker( $planned_pass ) };
 
-      $reduced     = $self->map_reduce( $reduced => $map_code );
+      $size_dups = $self->map_reduce( $size_dups => $map_code );
+
+      $new_count = $self->count_dups( $size_dups );
+
+      $diff      = $dup_count - $new_count;
+
+      $dup_count = $new_count;
+
+      $self->say_stderr( "   ...ELIMINATED $diff NON-DUPS IN PASS $pass_count" );
+      $self->say_stderr( "      ...$new_count POTENTIAL DUPS REMAIN" );
+   }
 
    $size_dups->{0} = $zero_files if ref $zero_files;
 
-   return $reduced;
+   return $size_dups;
 }
 
 sub _weed_worker
 {
    my ( $self, $weeder ) = @_;
-
-   local $/;
 
    WORKER: while
    (

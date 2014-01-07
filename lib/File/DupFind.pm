@@ -13,6 +13,7 @@ use Term::ProgressBar;
 
 has opts => ( is => 'ro', isa => 'HashRef', required => 1 );
 has ftl  => ( is => 'ro', lazy_build => 1 );
+has weed_pass_map => ( is => 'ro', isa => 'HashRef', lazy_build => 1 );
 
 sub _build_ftl
 {
@@ -30,11 +31,33 @@ sub _build_ftl
    );
 }
 
+sub _build_weed_pass_map
+{
+   {
+                  first => '_get_first_bytes',
+                 middle => '_get_middle_byte',
+                   last => '_get_last_bytes',
+            middle_last => '_get_middle_last_bytes',
+      first_middle_last => '_get_first_middle_last_bytes',
+   }
+}
+
+sub count_dups
+{
+   my ( $self, $dups ) = @_;
+
+   my $count = 0;
+
+   $count += @$_ for map { $dups->{ $_ } } keys %$dups;
+
+   return $count;
+}
+
 sub get_size_dups
 {
    my $self = shift;
 
-   my ( $size_dups, $scan_count, $size_dup_count ) = ( {}, 0, 0 );
+   my ( $size_dups, $scan_count ) = ( {}, 0 );
 
    $self->ftl->list_dir
    (
@@ -57,9 +80,7 @@ sub get_size_dups
       for grep { @{ $size_dups->{ $_ } } == 1 }
       keys %$size_dups;
 
-   $size_dup_count += @$_ for map { $size_dups->{ $_ } } keys %$size_dups;
-
-   return $size_dups, $scan_count, $size_dup_count;
+   return $size_dups, $scan_count, $self->count_dups( $size_dups );
 }
 
 sub toss_out_hardlinks
@@ -94,24 +115,54 @@ sub weed_dups
 
    my $zero_sized = delete $size_dups->{0};
 
-   my $pass_count = 0;
+   my $pass_count;
 
-   $size_dups = $self->_pull_weeds
-      (
-         $size_dups => '_get_file_first_bytes' => ++$pass_count
-      );
-
-   $size_dups = $self->_pull_weeds
-      (
-         $size_dups => '_get_file_last_bytes' => ++$pass_count
-      );
-
-   $size_dups = $self->_pull_weeds
-      (
-         $size_dups => '_get_file_middle_byte' => ++$pass_count
-      );
+   $self->_do_weed_pass( $size_dups => $_ => ++$pass_count )
+      for $self->_plan_weed_passes;
 
    $size_dups->{0} = $zero_sized if ref $zero_sized;
+
+   return $size_dups;
+}
+
+sub _plan_weed_passes
+{
+   my $self = shift;
+   my @plan = ();
+
+   for my $pass_type ( @{ $self->opts->{wpass} } )
+   {
+      die "Unrecognized weed pass type $pass_type"
+         if ! exists $self->weed_pass_map->{ $pass_type };
+
+$self->say_stderr( 'PLANNING WEED PASS: ' . $self->weed_pass_map->{ $pass_type } );
+
+      push @plan, $self->weed_pass_map->{ $pass_type };
+   }
+
+   return @plan;
+}
+
+sub _do_weed_pass
+{
+   my ( $self, $size_dups, $pass_type, $pass_count ) = @_;
+
+   my $dup_count = $self->count_dups( $size_dups );
+
+   my ( $new_count, $diff );
+
+   $self->say_stderr( "** $dup_count POTENTIAL DUPLICATES" );
+
+   $size_dups = $self->_pull_weeds( $size_dups => $pass_type => ++$pass_count );
+
+   $new_count = $self->count_dups( $size_dups );
+
+   $diff      = $dup_count - $new_count;
+
+   $dup_count = $new_count;
+
+   $self->say_stderr( "   ...ELIMINATED $diff NON-DUPS IN PASS $pass_count" );
+   $self->say_stderr( "      ...$new_count POTENTIAL DUPS REMAIN" );
 
    return $size_dups;
 }
@@ -123,10 +174,8 @@ sub _pull_weeds
 
    my ( $self, $size_dups, $weeder, $pass_count ) = @_;
 
-   my $dup_count = 0;
+   my $dup_count = $self->count_dups( $size_dups );
    my $len = 64;
-
-   $dup_count += @$_ for map { $size_dups->{ $_ } } keys %$size_dups;
 
    my $progress_bar = Term::ProgressBar->new
       (
@@ -177,7 +226,7 @@ sub _pull_weeds
    return $size_dups;
 }
 
-sub _get_file_first_bytes
+sub _get_first_bytes
 {
    my ( $self, $file, $len, $size ) = @_;
 
@@ -196,7 +245,63 @@ sub _get_file_first_bytes
    return $buff;
 }
 
-sub _get_file_last_bytes
+sub _get_middle_last_bytes
+{
+   my ( $self, $file, $len, $size ) = @_;
+
+   my ( $buff_mid, $buff_last );
+
+   $len ||= 32;
+
+   my $pos = int $size / 2;
+
+   sysopen my $fh, $file, 0 or warn $!;
+
+   return unless defined $fh;
+
+   sysseek $fh, $pos, 0;
+
+   sysread $fh, $buff_mid, 1;
+
+   sysseek $fh, $size - $len, 0;
+
+   sysread $fh, $buff_last, $len;
+
+   close $fh or return;
+
+   return $buff_mid . $buff_last;
+}
+
+sub _get_first_middle_last_bytes
+{
+   my ( $self, $file, $len, $size ) = @_;
+
+   my ( $buff_first, $buff_mid, $buff_last );
+
+   $len ||= 32;
+
+   my $pos = int $size / 2;
+
+   sysopen my $fh, $file, 0 or warn $!;
+
+   return unless defined $fh;
+
+   sysread $fh, $buff_first, $len;
+
+   sysseek $fh, $pos, 0;
+
+   sysread $fh, $buff_mid, 1;
+
+   sysseek $fh, $size - $len, 0;
+
+   sysread $fh, $buff_last, $len;
+
+   close $fh or return;
+
+   return $buff_first . $buff_mid . $buff_last;
+}
+
+sub _get_last_bytes
 {
    my ( $self, $file, $len, $size ) = @_;
 
@@ -217,7 +322,7 @@ sub _get_file_last_bytes
    return $buff;
 }
 
-sub _get_file_middle_byte
+sub _get_middle_byte
 {
    my ( $self, $file, $len, $size ) = @_;
 
@@ -244,14 +349,13 @@ sub digest_dups
 {
    my ( $self, $size_dups ) = @_;
    my $digests   = {};
-   my $dup_count = 0;
    my $prgs_iter = 0;
 
    # don't bother to hash zero-size files
    $digests->{ xxhash_hex '', 0 } = delete $size_dups->{0}
       if exists $size_dups->{0};
 
-   $dup_count += @$_ for map { $size_dups->{ $_ } } keys %$size_dups;
+   my $dup_count = $self->count_dups( $size_dups );
 
    my $progress  = Term::ProgressBar->new
       (
@@ -383,6 +487,8 @@ sub delete_dups
 
    say "** TOTAL DUPLICATE FILES REMOVED: $removed";
 }
+
+sub say_stderr { shift; warn "$_\n" for @_ };
 
 __PACKAGE__->meta->make_immutable;
 
