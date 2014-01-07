@@ -115,10 +115,7 @@ sub weed_dups
 
    my $zero_sized = delete $size_dups->{0};
 
-   my $pass_count;
-
-   $self->_do_weed_pass( $size_dups => $_ => ++$pass_count )
-      for $self->_plan_weed_passes;
+   $self->_do_weed_pass( $size_dups => $_ ) for $self->_plan_weed_passes;
 
    $size_dups->{0} = $zero_sized if ref $zero_sized;
 
@@ -135,8 +132,6 @@ sub _plan_weed_passes
       die "Unrecognized weed pass type $pass_type"
          if ! exists $self->weed_pass_map->{ $pass_type };
 
-$self->say_stderr( 'PLANNING WEED PASS: ' . $self->weed_pass_map->{ $pass_type } );
-
       push @plan, $self->weed_pass_map->{ $pass_type };
    }
 
@@ -145,11 +140,11 @@ $self->say_stderr( 'PLANNING WEED PASS: ' . $self->weed_pass_map->{ $pass_type }
 
 sub _do_weed_pass
 {
-   my ( $self, $size_dups, $pass_type, $pass_count ) = @_;
+   my ( $self, $size_dups, $pass_type ) = @_;
 
    my $dup_count = $self->count_dups( $size_dups );
 
-   my ( $new_count, $diff );
+   my ( $pass_count, $new_count, $diff );
 
    $self->say_stderr( "** $dup_count POTENTIAL DUPLICATES" );
 
