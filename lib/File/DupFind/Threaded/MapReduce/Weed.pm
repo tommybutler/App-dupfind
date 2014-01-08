@@ -47,7 +47,7 @@ sub weed_dups
       $self->say_stderr( "      ...$new_count POTENTIAL DUPS REMAIN" );
    }
 
-   $size_dups->{0} = $zero_files if ref $zero_files;
+   $size_dups->{0} = &shared_clone( $zero_files ) if ref $zero_files;
 
    return $size_dups;
 }
