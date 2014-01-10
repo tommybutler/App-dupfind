@@ -6,6 +6,7 @@ package File::DupFind::Threaded::AllTasks;
 use 5.010;
 
 use Moose;
+use MooseX::XSAccessor;
 
 use lib 'lib';
 

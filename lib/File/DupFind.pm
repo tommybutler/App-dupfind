@@ -6,14 +6,19 @@ package File::DupFind;
 use 5.010;
 
 use Moose;
+use MooseX::XSAccessor;
 use File::Util;
 use Digest::xxHash 'xxhash_hex';
 use Term::Prompt 'prompt';
-use Term::ProgressBar;
 
 has opts => ( is => 'ro', isa => 'HashRef', required => 1 );
 has ftl  => ( is => 'ro', lazy_build => 1 );
 has weed_pass_map => ( is => 'ro', isa => 'HashRef', lazy_build => 1 );
+
+before [ qw/ weed_dups digest_dups / ] => sub
+{
+   eval 'use Term::ProgressBar' if shift->opts->{progress}
+};
 
 sub _build_ftl
 {
@@ -170,9 +175,13 @@ sub _pull_weeds
    my ( $self, $size_dups, $weeder, $pass_count ) = @_;
 
    my $dup_count = $self->count_dups( $size_dups );
-   my $len = 64;
+   my $len = $self->opts->{wpsize};
 
-   my $progress_bar = Term::ProgressBar->new
+   my ( $progress_bar, $i );
+
+   if ( $self->opts->{progress} )
+   {
+      $progress_bar = Term::ProgressBar->new
       (
          {
             name   => '   ...WEED-OUT PASS ' . $pass_count,
@@ -180,8 +189,7 @@ sub _pull_weeds
             remove => 1,
          }
       );
-
-   my $i = 0;
+   }
 
    for my $same_size ( keys %$size_dups )
    {
@@ -196,7 +204,7 @@ sub _pull_weeds
          push @{ $same_bytes->{ $bytes_read } }, $file
             if defined $bytes_read;
 
-         $progress_bar->update( $i++ );
+         $progress_bar->update( $i++ ) if $progress_bar;
       }
 
       # delete obvious non-dupe files from the group of same-size files
@@ -216,7 +224,7 @@ sub _pull_weeds
          keys %$same_bytes;
    }
 
-   $progress_bar->update( $i );
+   $progress_bar->update( $i ) if $progress_bar;
 
    return $size_dups;
 }
@@ -280,6 +288,8 @@ sub _get_first_middle_last_bytes
    sysopen my $fh, $file, 0 or warn $!;
 
    return unless defined $fh;
+
+   close $fh and return $buff_first if $size <= $len;
 
    sysread $fh, $buff_first, $len;
 
@@ -359,7 +369,7 @@ sub digest_dups
             count  => $dup_count,
             remove => 1,
          }
-      );
+      ) if $self->opts->{progress};
 
    local $/;
 
@@ -379,7 +389,7 @@ sub digest_dups
 
          push @{ $digests->{ $digest } }, $file;
 
-         $progress->update( $prgs_iter++ );
+         $progress->update( $prgs_iter++ ) if $progress;
       }
    }
 
@@ -387,7 +397,7 @@ sub digest_dups
       for grep { @{ $digests->{ $_ } } == 1 }
       keys %$digests;
 
-   $progress->update( $dup_count );
+   $progress->update( $dup_count ) if $progress;
 
    return $digests;
 }

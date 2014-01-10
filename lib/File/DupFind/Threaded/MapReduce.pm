@@ -9,6 +9,7 @@ use threads;
 use threads::shared;
 
 use Moose;
+use MooseX::XSAccessor;
 use Time::HiRes 'usleep';
 
 use lib 'lib';

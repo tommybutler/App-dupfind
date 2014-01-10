@@ -9,6 +9,7 @@ use threads;
 use threads::shared;
 
 use Moose::Role;
+use MooseX::XSAccessor;
 
 use Time::HiRes 'usleep';
 
@@ -25,7 +26,9 @@ sub weed_dups
 
    my $dup_count  = $self->count_dups( $size_dups );
 
-   my ( $map_code, $pass_count, $new_count, $diff );
+   my ( $map_code, $pass_count, $new_count, $diff, $len );
+
+   $len = $self->opts->{wpsize} || 32;
 
    for my $planned_pass ( $self->_plan_weed_passes )
    {
@@ -33,7 +36,7 @@ sub weed_dups
 
       $self->say_stderr( "** $dup_count POTENTIAL DUPLICATES" );
 
-      $map_code  = sub { $self->_weed_worker( $planned_pass ) };
+      $map_code  = sub { $self->_weed_worker( $planned_pass, $len ) };
 
       $size_dups = $self->map_reduce( $size_dups => $map_code );
 
@@ -54,7 +57,7 @@ sub weed_dups
 
 sub _weed_worker
 {
-   my ( $self, $weeder ) = @_;
+   my ( $self, $weeder, $len ) = @_;
 
    WORKER: while
    (
@@ -70,7 +73,7 @@ sub _weed_worker
 
       GROUPING: for my $file ( @$grouping )
       {
-         my $bytes_read = $self->$weeder( $file, 64, $file_size );
+         my $bytes_read = $self->$weeder( $file, $len, $file_size );
 
          $self->increment_counter;
 

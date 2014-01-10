@@ -5,7 +5,10 @@ package File::DupFind::Threaded;
 
 use 5.010;
 
-BEGIN { $|++; $SIG{TERM} = $SIG{INT} = \&kill_thread_pool; }
+BEGIN
+{
+   $SIG{TERM} = $SIG{INT} = sub { $_->kill( 'KILL' ) for threads->list };
+}
 
 use threads;
 use threads::shared;
@@ -16,6 +19,7 @@ our $init_flag :shared = 0;
 our $mapped    = &share( {} );
 
 use Moose;
+use MooseX::XSAccessor;
 
 use Thread::Queue;
 use Time::HiRes 'usleep';
@@ -114,7 +118,17 @@ sub create_thread_pool
 {
    my ( $self, $map_code, $dup_count ) = @_;
 
-   threads->create( sub { $self->threads_progress( $dup_count ) } );
+   $self->init_flag( 1 );
+
+   threads->create
+   (
+      sub
+      {
+         eval 'use Term::ProgressBar';
+
+         $self->threads_progress( $dup_count )
+      }
+   ) if $self->opts->{progress};
 
    for ( 1 .. $self->opts->{threads} )
    {
@@ -122,8 +136,6 @@ sub create_thread_pool
 
       threads->create( $map_code );
    }
-
-   $self->init_flag( 1 );
 }
 
 sub end_wait_thread_pool
@@ -136,8 +148,6 @@ sub end_wait_thread_pool
 
    $_->join for threads->list;
 }
-
-sub kill_thread_pool { $_->kill for threads->list }
 
 sub threads_progress
 {
