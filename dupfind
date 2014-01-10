@@ -22,6 +22,7 @@ my $opts =
    help     => undef,
    bytes    => 1024 ** 3, # 1 GB max read
    maxdepth => 10,
+   progress => 0,
    prompt   => 0,
    remove   => 0,
    links    => 0,
@@ -29,6 +30,7 @@ my $opts =
    format   => 'human', # formatting options are either "human" or "robot"
    weed     => 1,
    wpass    => [ ],
+   wpsize   => 32,
    qsize    => 30,
 };
 
@@ -38,13 +40,15 @@ GetOptions
    'bytes|b=i'    => \$opts->{bytes},
    'maxdepth|m=i' => \$opts->{maxdepth},
    'links|l'      => \$opts->{links},
+   'g|progress'   => \$opts->{progress},
    'prompt|p'     => \$opts->{prompt},
    'remove|x'     => \$opts->{remove},
    'help|h|?'     => \$opts->{help},
    'threads|t=i'  => \$opts->{threads},
    'format|f=s'   => \$opts->{format},
    'weed|w=s'     => \$opts->{weed},
-   'wpass=s'      => $opts->{wpass},
+   'wpass=s'      =>  $opts->{wpass},
+   'wpsize=i'     => \$opts->{wpsize},
    'qsize|q=i'    => \$opts->{qsize},
 ) or exit usage();
 
@@ -104,7 +108,7 @@ sub run
 
    undef $size_dups; # free up some RAM
 
-   say_stderr '** DISPLAYING OUTPUT'; say '-' x 30;
+   say_stderr '** DISPLAYING OUTPUT'; say_stderr '-' x 30;
 
    my $dup_count = $fdf->show_dups( $digest_dups );
 
@@ -259,6 +263,8 @@ ARGUMENTS AND FLAGS:
                   recurse.  Note that this does not mean the total number of
                   directories to scan.
 
+   -g, --progress Display a progress bar.  Why "-g"?  Because I ran out of "-p"s
+
    -p, --prompt   Interactively prompt user to delete detected duplicates
 
    -q, --qsize    Number of files each thread should process at a time. The
@@ -298,4 +304,11 @@ ARGUMENTS AND FLAGS:
                   Weed-out filters are executed in the order you specify.
 
                   Example usage: dupfind --wpass first --wpass last [...]
+
+   --wpsize       Integer indicating the number of bytes to read per file
+                  during a weed-out pass.  Default: 32.  If your weed-out
+                  pass type reads a file in two or more places, this value
+                  will be used for each read except "middle" reads, which
+                  are always 1 byte only.
+
 __USAGE__

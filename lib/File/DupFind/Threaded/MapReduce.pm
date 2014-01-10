@@ -8,7 +8,7 @@ use 5.010;
 use threads;
 use threads::shared;
 
-use Moose;
+use Moo;
 use Time::HiRes 'usleep';
 
 use lib 'lib';

@@ -5,7 +5,7 @@ package File::DupFind::Threaded::AllTasks;
 
 use 5.010;
 
-use Moose;
+use Moo;
 
 use lib 'lib';
 

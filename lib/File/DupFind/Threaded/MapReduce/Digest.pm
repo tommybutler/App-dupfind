@@ -8,12 +8,14 @@ use 5.010;
 use threads;
 use threads::shared;
 
-use Moose::Role;
+use Moo::Role;
 
 use Time::HiRes 'usleep';
 use Digest::xxHash 'xxhash_hex';
 
 requires 'opts';
+
+my $read_semaphore :shared;
 
 sub digest_dups
 {
@@ -50,6 +52,8 @@ sub _digest_worker
       && defined ( my $grouping = $self->work_queue->dequeue )
    )
    {
+      my $data;
+
       GROUPING: for my $file ( @$grouping )
       {
          open my $fh, '<', $file or do
@@ -59,7 +63,12 @@ sub _digest_worker
                next GROUPING;
             };
 
-         my $data = <$fh>;
+         READ_LOCK:
+         {
+            lock $read_semaphore;
+
+            $data = <$fh>;
+         }
 
          close $fh;
 
