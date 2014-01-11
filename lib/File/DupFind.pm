@@ -5,16 +5,15 @@ package File::DupFind;
 
 use 5.010;
 
-use Moose;
-use MooseX::XSAccessor;
+use Moo;
 use Digest::xxHash 'xxhash_hex';
 use Term::Prompt 'prompt';
 
 use lib 'lib';
 
-with 'File::DupFind::Guts';
+has opts  => ( is => 'ro', required => 1 );
 
-has opts => ( is => 'ro', required => 1 );
+with 'File::DupFind::Guts';
 
 before [ qw/ weed_dups digest_dups / ] => sub
 {
@@ -94,7 +93,10 @@ sub weed_dups
 
    my $zero_sized = delete $size_dups->{0};
 
-   $self->_do_weed_pass( $size_dups => $_ ) for $self->_plan_weed_passes;
+   my $pass_count = 0;
+
+   $self->_do_weed_pass( $size_dups => $_ => ++$pass_count )
+      for $self->_plan_weed_passes;
 
    $size_dups->{0} = $zero_sized if ref $zero_sized;
 
@@ -104,7 +106,16 @@ sub weed_dups
 sub digest_dups
 {
    my ( $self, $size_dups ) = @_;
+
    my ( $digests, $progress, $i ) = ( {}, undef, 0 );
+
+   my $digest_cache  = {};
+   my $cache_stop    = $self->opts->{cachestop};
+   my $max_cache     = $self->opts->{cachesize};
+   my $ram_caching   = !! $self->opts->{ramcache};
+   my $cache_size    = 0;
+   my $cache_hits    = 0;
+   my $cache_misses  = 0;
 
    # don't bother to hash zero-size files
    $digests->{ xxhash_hex '', 0 } = delete $size_dups->{0}
@@ -126,29 +137,62 @@ sub digest_dups
 
    local $/;
 
-   for my $size ( keys %$size_dups )
+   SIZES: for my $size ( keys %$size_dups )
    {
       my $group = $size_dups->{ $size };
 
-      for my $file ( @$group )
+      GROUPING: for my $file ( @$group )
       {
+         my $digest;
+
          open my $fh, '<', $file or next;
 
          my $data = <$fh>;
 
          close $fh;
 
-         my $digest = xxhash_hex $data, 0;
+         if ( $ram_caching )
+         {
+            if ( $digest = $digest_cache->{ $data } )
+            {
+               $cache_hits++;
+            }
+            else
+            {
+               if ( $cache_size < $max_cache && $size <= $cache_stop )
+               {
+                  $digest_cache->{ $data } = $digest = xxhash_hex $data, 0;
+
+                  $cache_size++;
+
+                  $cache_misses++;
+               }
+               else
+               {
+                  $digest = xxhash_hex $data, 0;
+               }
+            }
+         }
+         else
+         {
+            $digest = xxhash_hex $data, 0;
+         }
 
          push @{ $digests->{ $digest } }, $file;
 
          $progress->update( ++$i ) if $progress;
       }
+
+      $digest_cache = {}; # it's only worthwhile per-size-grouping
+      $cache_size   = 0;
    }
 
    delete $digests->{ $_ }
       for grep { @{ $digests->{ $_ } } == 1 }
       keys %$digests;
+
+   $self->stats->{cache_hits}   = $cache_hits;
+   $self->stats->{cache_misses} = $cache_misses;
 
    return $digests;
 }
@@ -249,7 +293,15 @@ sub delete_dups
    say "** TOTAL DUPLICATE FILES REMOVED: $removed";
 }
 
-sub say_stderr { shift; chomp and warn "$_\n" for @_ };
+sub cache_stats
+{
+   my $self = shift;
+
+   return $self->stats->{cache_hits},
+          $self->stats->{cache_misses}
+}
+
+sub say_stderr { shift; chomp for @_; warn "$_\n" for @_ };
 
 __PACKAGE__->meta->make_immutable;
 

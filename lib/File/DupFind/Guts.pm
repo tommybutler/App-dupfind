@@ -6,11 +6,21 @@ package File::DupFind::Guts;
 use 5.010;
 
 use File::Util;
+
 use Moo::Role;
-use MooseX::XSAccessor;
+
+use lib 'lib';
+
+requires 'opts';
+
+with 'File::DupFind::Guts::Algorithms';
 
 has weed_pass_map => ( is => 'ro', builder => '_build_wpmap' );
-has ftl  => ( is => 'ro', builder => '_build_ftl', lazy => 1 );
+
+has ftl => ( is => 'ro', builder => '_build_ftl', lazy => 1 );
+
+has stats => ( is => 'rw', builder => sub { {} } );
+
 
 sub _build_ftl
 {
@@ -31,10 +41,11 @@ sub _build_ftl
 sub _build_wpmap
 {
    {
+                   last => '_get_last_bytes',
                   first => '_get_first_bytes',
                  middle => '_get_middle_byte',
-                   last => '_get_last_bytes',
             middle_last => '_get_middle_last_bytes',
+          almost_middle => '_get_bytes_n_offset_n',
       first_middle_last => '_get_first_middle_last_bytes',
    }
 }
@@ -57,15 +68,15 @@ sub _plan_weed_passes
 
 sub _do_weed_pass
 {
-   my ( $self, $size_dups, $pass_type ) = @_;
+   my ( $self, $size_dups, $pass_type, $pass_count ) = @_;
 
    my $dup_count = $self->count_dups( $size_dups );
 
-   my ( $pass_count, $new_count, $difference );
+   my ( $new_count, $difference );
 
-   $self->say_stderr( "** $dup_count POTENTIAL DUPLICATES" );
+   $self->say_stderr( "      $dup_count POTENTIAL DUPLICATES" );
 
-   $size_dups  = $self->_pull_weeds( $size_dups => $pass_type => ++$pass_count );
+   $size_dups  = $self->_pull_weeds( $size_dups => $pass_type => $pass_count );
 
    $new_count  = $self->count_dups( $size_dups );
 
@@ -74,8 +85,7 @@ sub _do_weed_pass
    $dup_count  = $new_count;
 
    $self->say_stderr( <<__WEED_PASS__ );
-      ...ELIMINATED $difference NON-DUPS IN PASS $pass_count
-         ...$new_count POTENTIAL DUPS REMAIN
+      ...ELIMINATED $difference NON-DUPS IN PASS #$pass_count. $new_count REMAIN
 __WEED_PASS__
 
    return $size_dups;
@@ -140,127 +150,6 @@ sub _pull_weeds
    $progress->update( $i ) if $progress;
 
    return $size_dups;
-}
-
-sub _get_first_bytes
-{
-   my ( $self, $file, $len, $size ) = @_;
-
-   my $buff;
-
-   $len ||= 64;
-
-   sysopen my $fh, $file, 0 or warn $!;
-
-   return unless defined $fh;
-
-   sysread $fh, $buff, $len;
-
-   close $fh or return;
-
-   return $buff;
-}
-
-sub _get_middle_last_bytes
-{
-   my ( $self, $file, $len, $size ) = @_;
-
-   my ( $buff_mid, $buff_last );
-
-   $len ||= 32;
-
-   my $pos = int $size / 2;
-
-   sysopen my $fh, $file, 0 or warn $!;
-
-   return unless defined $fh;
-
-   sysseek $fh, $pos, 0;
-
-   sysread $fh, $buff_mid, 1;
-
-   sysseek $fh, $size - $len, 0;
-
-   sysread $fh, $buff_last, $len;
-
-   close $fh or return;
-
-   return $buff_mid . $buff_last;
-}
-
-sub _get_first_middle_last_bytes
-{
-   my ( $self, $file, $len, $size ) = @_;
-
-   my ( $buff_first, $buff_mid, $buff_last );
-
-   $len ||= 32;
-
-   my $pos = int $size / 2;
-
-   sysopen my $fh, $file, 0 or warn $!;
-
-   return unless defined $fh;
-
-   close $fh and return $buff_first if $size <= $len;
-
-   sysread $fh, $buff_first, $len;
-
-   sysseek $fh, $pos, 0;
-
-   sysread $fh, $buff_mid, 1;
-
-   sysseek $fh, $size - $len, 0;
-
-   sysread $fh, $buff_last, $len;
-
-   close $fh or return;
-
-   return $buff_first . $buff_mid . $buff_last;
-}
-
-sub _get_last_bytes
-{
-   my ( $self, $file, $len, $size ) = @_;
-
-   my $buff;
-
-   $len ||= 64;
-
-   sysopen my $fh, $file, 0 or warn $!;
-
-   return unless defined $fh;
-
-   sysseek $fh, $size - $len, 0;
-
-   sysread $fh, $buff, $len;
-
-   close $fh or return;
-
-   return $buff;
-}
-
-sub _get_middle_byte
-{
-   my ( $self, $file, $len, $size ) = @_;
-
-   my $buff;
-
-   $len = 1;
-
-   my $pos = int $size / 2;
-
-   sysopen my $fh, $file, 0 or warn $!;
-
-   return unless defined $fh;
-
-   sysseek $fh, $pos, 0;
-
-   sysread $fh, $buff, $len;
-
-   close $fh or return;
-
-   return $buff;
 }
 
 1;

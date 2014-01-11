@@ -18,48 +18,66 @@ use subs 'say_stderr';
 
 my $opts =
 {
-   dir      => undef,
-   help     => undef,
-   bytes    => 1024 ** 3, # 1 GB max read
-   maxdepth => 10,
-   progress => 0,
-   prompt   => 0,
-   remove   => 0,
-   links    => 0,
-   threads  => 0,
-   format   => 'human', # formatting options are either "human" or "robot"
-   weed     => 1,
-   wpass    => [ ],
-   wpsize   => 32,
-   qsize    => 30,
+   bytes     => 1024 ** 3,           # 1 GB max read
+   cachestop => ( 1024 ** 2 ) * 2,   # 2 MB file size limit on cache candidacy
+   dir       => undef,
+   format    => 'human',             # options are "human" or "robot"
+   help      => undef,
+   links     => 0,
+   maxdepth  => 10,
+   progress  => 0,
+   prompt    => 0,
+   qsize     => 30,
+   ramcache  => ( 1024 ** 2 ) * 300, # 300 MB default cache size
+   remove    => 0,
+   threads   => 0,
+   verbose   => 0,
+   weed      => 1,
+   wpass     => [ ],
+   wpsize    => 32,
 };
 
 GetOptions
 (
-   'dir|d=s'      => \$opts->{dir},
    'bytes|b=i'    => \$opts->{bytes},
-   'maxdepth|m=i' => \$opts->{maxdepth},
-   'links|l'      => \$opts->{links},
-   'g|progress'   => \$opts->{progress},
-   'prompt|p'     => \$opts->{prompt},
-   'remove|x'     => \$opts->{remove},
-   'help|h|?'     => \$opts->{help},
-   'threads|t=i'  => \$opts->{threads},
+   'cachestop=i'  => \$opts->{cachestop},
+   'dir|d=s'      => \$opts->{dir},
    'format|f=s'   => \$opts->{format},
-   'weed|w=s'     => \$opts->{weed},
+   'help|h|?'     => \$opts->{help},
+   'links|l'      => \$opts->{links},
+   'maxdepth|m=i' => \$opts->{maxdepth},
+   'progress'     => \$opts->{progress},
+   'prompt|p'     => \$opts->{prompt},
+   'qsize|q=i'    => \$opts->{qsize},
+   'ramcache=i'   => \$opts->{ramcache},
+   'remove|x'     => \$opts->{remove},
+   'threads|t=i'  => \$opts->{threads},
+   'verbose|v'    => \$opts->{verbose},
+   'weedout|w=s'  => \$opts->{weed},
    'wpass=s'      =>  $opts->{wpass},
    'wpsize=i'     => \$opts->{wpsize},
-   'qsize|q=i'    => \$opts->{qsize},
 ) or exit usage();
 
 exit usage() unless defined $opts->{dir};
 
 $opts->{threads} //= 0;
+
 $opts->{remove}    = 1 if $opts->{prompt};
+
 $opts->{weed}      = 0 if $opts->{weed} =~ /^(n|no)$/i;
+
 $opts->{weed}      = 1 if !! @{ $opts->{wpass} };
+
 $opts->{wpass}     = [ 'first_middle_last' ]
    if $opts->{weed} && ! @{ $opts->{wpass} };
+
+die 'Bogus cache parameters provided!  Just use the defaults buddy.'
+   if $opts->{cachestop} < 0 || $opts->{ramcache} < 0;
+
+die 'Inappropriate cachestop size; must be a small fraction of total ramcache.'
+   if $opts->{ramcache} && $opts->{cachestop} > ( $opts->{ramcache} / 100 );
+
+$opts->{cachesize} = int ( $opts->{ramcache} / $opts->{cachestop} );
 
 my $fdf = $opts->{threads}
    ? File::DupFind::Threaded::AllTasks->new( opts => $opts )
@@ -77,9 +95,13 @@ my $benchmarks =
 
 my ( $scan_count, $size_dup_count, $dup_count ) = run();
 
+my ( $cache_hits, $cache_misses ) = $fdf->cache_stats;
+
 say_stderr <<__SUMMARY__;
 ------------------------------
 ** THREADS...............$opts->{threads}
+** RAM CACHE.............$opts->{ramcache} bytes
+** CACHE HITS/MISSES.....$cache_hits/$cache_misses
 ** TOTAL FILES SCANNED...$scan_count
 ** TOTAL SAME SIZE.......$size_dup_count
 ** TOTAL ACTUAL DUPES....$dup_count
@@ -240,7 +262,7 @@ DESCRIPTION:
    implemented and are planned for a future release
 
 ARGUMENTS AND FLAGS:
-   -b, --bytes    Maximum size in bytes that you are willing to compare.
+   -b, --bytes    Maximum file size in bytes that you are willing to compare.
                   The current default maximum is 1 gigabyte.
 
                   Sizing guide:
@@ -248,6 +270,11 @@ ARGUMENTS AND FLAGS:
                      1 megabyte = 1048576        or 1024 ** 2
                      1 gigabyte = 1073741824     or 1024 ** 3
                      1 terabyte = 1099511627776  or 1024 ** 4
+
+   --cachestop    Integer indicating the maximum file size to put into the
+                  cache of computed file digests.  Note that this is NOT the
+                  max amount of RAM to consume for the cache. (see --ramcache)
+                  Default value: 1 megabyte
 
    -d, --dir      Name of the directory you want to search for duplicates
 
@@ -263,12 +290,18 @@ ARGUMENTS AND FLAGS:
                   recurse.  Note that this does not mean the total number of
                   directories to scan.
 
-   -g, --progress Display a progress bar.  Why "-g"?  Because I ran out of "-p"s
+   --progress     Display a progress bar.  Why "-g"?  Because I ran out of "-p"s
 
    -p, --prompt   Interactively prompt user to delete detected duplicates
 
    -q, --qsize    Number of files each thread should process at a time. The
                   the default is 30.
+
+   --ramcache     Integer indicating the number of bytes of RAM to consume
+                  for the cache of computed file digests.  Note that dupfind
+                  will still use a substantial amount of memory for other
+                  internal purposes that don't have to do with the cache.
+                  Default: 100 megabytes.  Set to 0 to disable ram cache.
 
    -x, --remove   CAUTION: Delete WITHOUT PROMPTING all but the first copy
                   if duplicate files are found.  This will leave you with no
@@ -280,7 +313,11 @@ ARGUMENTS AND FLAGS:
                   number of threads equal to the number of logical processors
                   on your system, plus 1.
 
-   -w, --weed     Either yes or no.  (Default yes).  Tries to avoid unnecessary
+   -v, --verbose  Gives you a progress bar (like --progress) and some extra,
+                  helpful output if you need more detail about file dupes
+                  detected by dupfind.
+
+   -w, --weedout  Either yes or no.  (Default yes).  Tries to avoid unnecessary
                   file hashing by weeding out potential duplicates with a
                   simple, quick comparison of the last 1024 bytes of data in
                   same-size files.  This typically produces very significant

@@ -44,6 +44,14 @@ sub _digest_worker
 {
    my $self = shift;
 
+   my $digest_cache  = {};
+   my $cache_stop    = $self->opts->{cachestop};
+   my $max_cache     = $self->opts->{cachesize};
+   my $ram_caching   = !! $self->opts->{ramcache};
+   my $cache_size    = 0;
+   my $cache_hits    = 0;
+   my $cache_misses  = 0;
+
    local $/;
 
    WORKER: while
@@ -56,6 +64,9 @@ sub _digest_worker
 
       GROUPING: for my $file ( @$grouping )
       {
+         my $size = -s $grouping->[0];
+         my $digest;
+
          open my $fh, '<', $file or do
             {
                $self->increment_counter;
@@ -72,12 +83,43 @@ sub _digest_worker
 
          close $fh;
 
-         my $digest = xxhash_hex $data, 0;
+         if ( $ram_caching )
+         {
+            if ( $digest = $digest_cache->{ $data } )
+            {
+               $cache_hits++;
+            }
+            else
+            {
+               if ( $cache_size < $max_cache && $size <= $cache_stop )
+               {
+                  $digest_cache->{ $data } = $digest = xxhash_hex $data, 0;
+
+                  $cache_size++;
+
+                  $cache_misses++;
+               }
+               else
+               {
+                  $digest = xxhash_hex $data, 0;
+               }
+            }
+         }
+         else
+         {
+            $digest = xxhash_hex $data, 0;
+         }
 
          $self->push_mapped( $digest => $file );
 
          $self->increment_counter;
       }
+
+      $digest_cache = {}; # it's only worthwhile per-size-grouping
+      $cache_size   = 0;
+
+      $self->add_stats( cache_hits   => $cache_hits );
+      $self->add_stats( cache_misses => $cache_misses );
    }
 }
 

@@ -9,7 +9,6 @@ use threads;
 use threads::shared;
 
 use Moo::Role;
-use MooseX::XSAccessor;
 
 use Time::HiRes 'usleep';
 
