@@ -5,14 +5,14 @@ use warnings;
 
 use 5.010;
 
-BEGIN { STDERR->autoflush(1); STDOUT->autoflush(1); }
+BEGIN { STDERR->autoflush; STDOUT->autoflush; }
 
 use Getopt::Long;
 use Benchmark ':hireswallclock';
 
 use lib 'lib';
 use File::DupFind;
-use File::DupFind::Threaded::AllTasks;
+use File::DupFind::Threaded;
 
 use subs 'say_stderr';
 
@@ -80,7 +80,7 @@ die 'Inappropriate cachestop size; must be a small fraction of total ramcache.'
 $opts->{cachesize} = int ( $opts->{ramcache} / $opts->{cachestop} );
 
 my $fdf = $opts->{threads}
-   ? File::DupFind::Threaded::AllTasks->new( opts => $opts )
+   ? File::DupFind::Threaded->new( opts => $opts )
    : File::DupFind->new( opts => $opts );
 
 my $benchmarks =

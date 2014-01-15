@@ -13,7 +13,7 @@ use Time::HiRes 'usleep';
 
 use lib 'lib';
 
-extends 'File::DupFind::Threaded';
+extends 'File::DupFind::Threaded::ThreadManagement';
 
 sub map_reduce
 {
