@@ -11,8 +11,8 @@ use Getopt::Long;
 use Benchmark ':hireswallclock';
 
 use lib 'lib';
-use File::DupFind;
-use File::DupFind::Threaded;
+use App::dupfind;
+use App::dupfind::Threaded;
 
 use subs 'say_stderr';
 
@@ -24,10 +24,9 @@ my $opts =
    format    => 'human',             # options are "human" or "robot"
    help      => undef,
    links     => 0,
-   maxdepth  => 10,
+   maxdepth  => 50,
    progress  => 0,
    prompt    => 0,
-   qsize     => 30,
    ramcache  => ( 1024 ** 2 ) * 300, # 300 MB default cache size
    remove    => 0,
    threads   => 0,
@@ -48,7 +47,6 @@ GetOptions
    'maxdepth|m=i' => \$opts->{maxdepth},
    'progress'     => \$opts->{progress},
    'prompt|p'     => \$opts->{prompt},
-   'qsize|q=i'    => \$opts->{qsize},
    'ramcache=i'   => \$opts->{ramcache},
    'remove|x'     => \$opts->{remove},
    'threads|t=i'  => \$opts->{threads},
@@ -80,8 +78,8 @@ die 'Inappropriate cachestop size; must be a small fraction of total ramcache.'
 $opts->{cachesize} = int ( $opts->{ramcache} / $opts->{cachestop} );
 
 my $fdf = $opts->{threads}
-   ? File::DupFind::Threaded->new( opts => $opts )
-   : File::DupFind->new( opts => $opts );
+   ? App::dupfind::Threaded->new( opts => $opts )
+   : App::dupfind->new( opts => $opts );
 
 my $benchmarks =
 {
@@ -282,6 +280,8 @@ ARGUMENTS AND FLAGS:
                   generated for easy viewing by default.  If you want output
                   that is machine-parseable, specify "robot"
 
+   -g, --progress Display a progress bar.  Why "-g"?  Because I ran out of "-p"s
+
 *  -l, --links    Follow symlinks (by default it does not).  Because this
                   has some safety implications and is a complex matter,
                   it is not yet supported.  Sorry, check back later.
@@ -290,12 +290,7 @@ ARGUMENTS AND FLAGS:
                   recurse.  Note that this does not mean the total number of
                   directories to scan.
 
-   --progress     Display a progress bar.  Why "-g"?  Because I ran out of "-p"s
-
    -p, --prompt   Interactively prompt user to delete detected duplicates
-
-   -q, --qsize    Number of files each thread should process at a time. The
-                  the default is 30.
 
    --ramcache     Integer indicating the number of bytes of RAM to consume
                   for the cache of computed file digests.  Note that dupfind
