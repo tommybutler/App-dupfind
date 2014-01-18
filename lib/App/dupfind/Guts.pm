@@ -202,7 +202,7 @@ regard to cache hits/misses during the digest_dups phase)
 Based on either or both the default settings and the user-specified weed-out
 algorithms to run on potential duplicates before resorting to calculating
 digests, this private method builds the ordered execution plan which is then
-caried out by $self->_pull_weeds
+carried out by $self->_pull_weeds
 
 =item _pull_weeds
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 
-# ABSTRACT: Implementation of App::dupfind (system script that does the work)
+# ABSTRACT: The implementation of App::dupfind (this script does the work)
 
 use strict;
 use warnings;
