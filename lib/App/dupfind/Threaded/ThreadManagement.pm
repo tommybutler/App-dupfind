@@ -190,63 +190,113 @@ Please don't use this module by itself.  It is for internal use only.
 
 =item clear_counter
 
-yada yada
+The "counter" in App::dupfind::Threaded::ThreadManagment is used to keep
+track of how many items have been processed by the thread pool.  This
+clear_counter method resets the counter.
 
 =item counter
 
-yada yada
+The counter itself is a read-only accessor around a thread-shared scalar int
 
 =item create_thread_pool
 
-yada yada
+Method that spawns N threads to do work for the map-reducer, where N is the
+number of threads that the user has specified with the "--threads N" flag.
+
+If the user has requested a progress bar, one more thread is spawned which
+does nothing but monitor overall progress of the thread pool and update
+the progress bar.
 
 =item delete_mapped
 
-yada yada
+Deletes a same-size file grouping from the global hashref of same-size file
+groupings, by key.  Thread-safe management of the datastructure is insured.
 
 =item end_wait_thread_pool
 
-yada yada
+Ends the global work queue, sets the thread terminate flag to 1, and joins
+the threads in the pool.
 
 =item increment_counter
 
-yada yada
+Thread-safe way to increment the global shared counter (scalar int value).
+The counter is key to the successful execution of all threads, and it is
+imperative that any code executed by the map-reduce engine properly calls
+increment_counter for work every item it processes.
 
 =item init_flag
 
-yada yada
+R/W accessor whose read value indicates that the thread pool has been initiated
+when the return value is true.
 
 =item mapped
 
-yada yada
+Read-only accessor to the global shared hashref of "work items", i.e.- the
+groupings of same-size files which are potential duplicates
 
 =item push_mapped
 
-yada yada
+The thread-safe way to push a new item or items onto a grouping in the global
+mapped work-item registry.  $obj->push_mapped( key => @items );
 
 =item reset_all
 
-yada yada
+Resets all flags, queues, work mappings, and counters.
+
+In turn, it calls:
+
+=over
+
+=item *
+
+$self->reset_queue
+
+=item *
+
+$self->clear_counter
+
+=item *
+
+$self->reset_mapped
+
+=item *
+
+$self->init_flag( 0 )
+
+=item *
+
+$self->term_flag( 0 )
+
+=back
 
 =item reset_mapped
 
-yada yada
+Destroys the globally-shared mapping of work items.  Takes no arguments.
 
 =item reset_queue
 
-yada yada
+Creates a new Thread::Queue object, which is then accessible via a call to
+$self->work_queue.  This does not end the previous Thread::Queue object.
+That is the responsibility of $self->end_wait_thread_pool
 
 =item term_flag
 
-yada yada
+R/W accessor method that indicates to threads that they should exit when
+a true value is returned.
 
 =item threads_progress
 
-yada yada
+This method is executed by the single helper thread whose sole responsibility
+is to update the progress bar for the thread pool, if the user has requested
+a progress bar
 
 =item work_queue
 
-yada yada
+Thread-safe shared Thread::Queue object for the current $self object.  It can
+be ended via $self->end_wait_thread_pool and it can thereafter be recreated
+via $self->reset_queue
+
+The map part of the map-reduce engine pushes work items into this queue.
 
 =back
 

@@ -183,11 +183,13 @@ Please don't use this module by itself.  It is for internal use only.
 
 =item weed_pass_map
 
-yada
+Conversion table for user-friendly names to the weeding algorithms to their
+internal method names.
 
 =item stats
 
-yada
+R/W Hashref accessor used for internally storing statistics (specifically with
+regard to cache hits/misses during the digest_dups phase)
 
 =back
 

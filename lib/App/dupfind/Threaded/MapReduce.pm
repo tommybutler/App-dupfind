@@ -33,7 +33,7 @@ sub mapper
    my ( $self, $size_dups, $map ) = @_;
    my $dup_count = 0;
 
-   $dup_count += @$_ for map { $size_dups->{ $_ } } keys %$size_dups;
+   $dup_count = $self->count_dups( $size_dups );
 
    # creates thread pool, passing in as an argument the number of files
    # that the pool needs to digest.  this is NOT equivalent to the number
@@ -101,15 +101,48 @@ Please don't use this module by itself.  It is for internal use only.
 
 =item map_reduce
 
-yada yada
+Wrapper/Conveniece method.
+
+Resets all flags, queues, work mappings, and counters.  Then it calls
+$self->mapper on its own @_.  Then it returns the result of $self->reducer;
 
 =item mapper
 
-yada yada
+Takes two arguments:
+
+1) a datastructure which it expects to be a hashref whose keys are file sizes
+and whose values are listrefs forming groupings of files that correspond to the
+indicated file size.
+
+2) a coderef to execute, which actually is spawned as N threads of the coderef
+where N is the number of threads that the user has requested.
+
+After spawning the thread pool, mapper() then iterates through the datastructure
+and places each grouping as a work item into the work queue for all threads.
+
+This is a possibly-too-fine-grained mapping of work to the threads, and so it
+may change in the future so that work is divided up in a different way, but for
+now, this is what we've got and it runs pretty darn fast.
+
+After spawning the threads and stuffing their work queue full of things to do,
+mapper waits until the threads report back that they are done working.  The
+counter mechanism from App::dupfind::Threaded::ThreadManagement is used to
+accomplish this.  When the counter of items processed is equal to the number
+of items that mapper put into the queue, mapper calls end_wait_thread_pool()
+which is inherited from the same class as the counter mechanism.
+
+That action cleans up the thread pool and the the application then becomes
+single-threaded again and is ready for $self->reducer to be called.
+
+This constitutes the "map" part of the map-reduce engine.
 
 =item reducer
 
-yada yada
+Scans through the result of an execution of $self->mapper, and "reduces" it
+to only the members of the result set that are duplicates (the entire point
+of this framework).
+
+This constitutes the "reduce" part of the map-reduce engine.
 
 =back
 

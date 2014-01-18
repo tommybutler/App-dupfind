@@ -66,7 +66,8 @@ sub _weed_worker
       && defined ( my $grouping = $self->work_queue->dequeue )
    )
    {
-      my $same_bytes = {};
+      my $same_bytes  = {};
+      my $weed_failed = [];
 
       next unless !! @$grouping; # why?
 
@@ -80,6 +81,8 @@ sub _weed_worker
 
          push @{ $same_bytes->{ $bytes_read } }, $file
             if defined $bytes_read;
+
+         push @$weed_failed, $file unless defined $bytes_read;
       }
 
       # delete obvious non-dupe files from the group of same-size files
@@ -93,6 +96,8 @@ sub _weed_worker
       # but leave out the files we just weeded out from the group
 
       my @group = map { @{ $same_bytes->{ $_ } } } keys %$same_bytes;
+
+      push @group, @$weed_failed if @$weed_failed;
 
       $self->push_mapped( $file_size => @group );
    }
