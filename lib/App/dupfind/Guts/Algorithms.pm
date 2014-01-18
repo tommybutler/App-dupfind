@@ -1,3 +1,5 @@
+# ABSTRACT: The private weeding algorithms available for use by public interface
+
 use strict;
 use warnings;
 
@@ -25,7 +27,7 @@ sub _get_first_bytes
 
    sysread $fh, $buff, $len;
 
-   close $fh or return;
+   close $fh or warn qq(Couldn't close filehandle to $file $!);
 
    return $buff;
 }
@@ -52,7 +54,7 @@ sub _get_middle_last_bytes
 
    sysread $fh, $buff_last, $len;
 
-   close $fh or return;
+   close $fh or warn qq(Couldn't close filehandle to $file $!);
 
    return $buff_mid . $buff_last;
 }
@@ -83,7 +85,7 @@ sub _get_first_middle_last_bytes
 
    sysread $fh, $buff_last, $len;
 
-   close $fh or return;
+   close $fh or warn qq(Couldn't close filehandle to $file $!);
 
    return $buff_first . $buff_mid . $buff_last;
 }
@@ -104,7 +106,7 @@ sub _get_last_bytes
 
    sysread $fh, $buff, $len;
 
-   close $fh or return;
+   close $fh or warn qq(Couldn't close filehandle to $file $!);
 
    return $buff;
 }
@@ -127,7 +129,7 @@ sub _get_middle_byte
 
    sysread $fh, $buff, $len;
 
-   close $fh or return;
+   close $fh or warn qq(Couldn't close filehandle to $file $!);
 
    return $buff;
 }
@@ -152,7 +154,7 @@ sub _get_bytes_n_offset_n
 
    sysread $fh, $buff, $len;
 
-   close $fh or return;
+   close $fh or warn qq(Couldn't close filehandle to $file $!);
 
    return $buff;
 }

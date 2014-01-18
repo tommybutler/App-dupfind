@@ -1,3 +1,5 @@
+# ABSTRACT: Composed class providing seemless threading support for $bin/dupfind
+
 use strict;
 use warnings;
 

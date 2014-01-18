@@ -1,3 +1,5 @@
+# ABSTRACT: Private methods supporting the App::dupfind::Common public interface
+
 use strict;
 use warnings;
 
@@ -118,7 +120,8 @@ sub _pull_weeds
 
    for my $same_size ( keys %$size_dups )
    {
-      my $same_bytes = {};
+      my $same_bytes  = {};
+      my $weed_failed = [];
 
       for my $file ( @{ $size_dups->{ $same_size } } )
       {
@@ -126,6 +129,8 @@ sub _pull_weeds
 
          push @{ $same_bytes->{ $bytes_read } }, $file
             if defined $bytes_read;
+
+         push @$weed_failed, $file unless defined $bytes_read;
 
          $progress->update( $i++ ) if $progress;
       }
@@ -142,9 +147,11 @@ sub _pull_weeds
 
       $size_dups->{ $same_size } = []; # start fresh
 
-      push @{ $size_dups->{ $same_size } },
+      @{ $size_dups->{ $same_size } } =
          map { @{ $same_bytes->{ $_ } } }
          keys %$same_bytes;
+
+      push @{ $size_dups->{ $same_size } }, @$weed_failed if @$weed_failed;
    }
 
    $progress->update( $i ) if $progress;

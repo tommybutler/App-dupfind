@@ -1,10 +1,13 @@
+# ABSTRACT: Methods and attributes that have to be overridden when threading
+
+# Overriding from:
+#  - App::dupfind::Common
+#  - App::dupfind::Guts
+
 use strict;
 use warnings;
 
-# methods and attributes that have to be overridden from App::dupfind::Guts
-# due to threading
-
-package App::dupfind::Threaded::GutOverrides;
+package App::dupfind::Threaded::Overrides;
 
 use 5.010;
 
@@ -42,7 +45,6 @@ requires 'opts';
       $stats->{ $key } += $val;
    }
 }
-
 
 sub sort_dups
 {

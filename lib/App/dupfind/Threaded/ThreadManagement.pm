@@ -27,7 +27,7 @@ use lib 'lib';
 
 extends 'App::dupfind';
 
-with 'App::dupfind::Threaded::GutOverrides';
+with 'App::dupfind::Threaded::Overrides';
 
 has work_queue => ( is => 'rw', default => sub { Thread::Queue->new } );
 

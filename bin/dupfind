@@ -1,5 +1,7 @@
 #!/usr/bin/env perl
 
+# ABSTRACT: Implementation of App::dupfind (system script that does the work)
+
 use strict;
 use warnings;
 
@@ -11,6 +13,7 @@ use Getopt::Long;
 use Benchmark ':hireswallclock';
 
 use lib 'lib';
+
 use App::dupfind;
 use App::dupfind::Threaded;
 
