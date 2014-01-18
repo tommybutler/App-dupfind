@@ -32,7 +32,6 @@ sub mapper
 {
    my ( $self, $size_dups, $map ) = @_;
    my $dup_count = 0;
-   my $queued    = 0;
 
    $dup_count += @$_ for map { $size_dups->{ $_ } } keys %$size_dups;
 
@@ -95,6 +94,24 @@ forming a task mapping that is then reduced upon completion to only the files
 that are truly duplicates.
 
 Please don't use this module by itself.  It is for internal use only.
+
+=head1 METHODS
+
+=over
+
+=item map_reduce
+
+yada yada
+
+=item mapper
+
+yada yada
+
+=item reducer
+
+yada yada
+
+=back
 
 =cut
 

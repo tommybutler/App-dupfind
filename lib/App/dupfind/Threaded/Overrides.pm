@@ -81,5 +81,23 @@ implemented by App::dupfind::Threaded::MapReduce
 
 Please don't use this module by itself.  It is for internal use only.
 
+=head1 METHODS
+
+=over
+
+=item add_stats
+
+yada
+
+=item sort_dups
+
+yada
+
+=item stats
+
+yada
+
+=back
+
 =cut
 

@@ -236,7 +236,7 @@ sub show_dups # also calls $self->sort_dups before displaying output
 
    my $for_robots = sub # machine parseable output
    {
-      my ( $digest, $files ) = @_;
+      my $files = pop;
 
       say join "\t", @$files
    };
@@ -325,9 +325,60 @@ Together with App::dupfind::Guts, the methods from this module are composed into
 the App::dupfind class in order to provide the user with the high-level methods
 that are directly callable from the user's application
 
-The methods here which are subclassed by App::dupfind are covered in the
+The following methods which are subclassed by App::dupfind are covered in the
 the documentation for that module, since they are meant for consumption by the
-user at that layer.
+user at that layer:
+
+=head1 METHODS
+
+=over
+
+=item cache_stats
+
+yada
+
+=item count_dups
+
+yada
+
+=item delete_dups
+
+yada
+
+=item digest_dups
+
+yada
+
+=item get_size_dups
+
+yada
+
+=item opts
+
+yada
+
+=item say_stderr
+
+yada
+
+=item show_dups
+
+yada
+
+=item sort_dups
+
+yada
+
+=item toss_out_hardlinks
+
+yada
+
+=item weed_dups
+
+yada
+
+=back
+
 
 =cut
 

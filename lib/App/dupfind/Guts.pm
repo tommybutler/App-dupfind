@@ -177,5 +177,19 @@ if you're searching for documentation on the App::dupfind namespace.
 
 Please don't use this module by itself.  It is for internal use only.
 
+=head1 ATTRIBUTES
+
+=over
+
+=item weed_pass_map
+
+yada
+
+=item stats
+
+yada
+
+=back
+
 =cut
 

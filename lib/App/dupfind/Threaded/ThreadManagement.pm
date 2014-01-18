@@ -184,5 +184,71 @@ track.
 
 Please don't use this module by itself.  It is for internal use only.
 
+=head1 METHODS
+
+=over
+
+=item clear_counter
+
+yada yada
+
+=item counter
+
+yada yada
+
+=item create_thread_pool
+
+yada yada
+
+=item delete_mapped
+
+yada yada
+
+=item end_wait_thread_pool
+
+yada yada
+
+=item increment_counter
+
+yada yada
+
+=item init_flag
+
+yada yada
+
+=item mapped
+
+yada yada
+
+=item push_mapped
+
+yada yada
+
+=item reset_all
+
+yada yada
+
+=item reset_mapped
+
+yada yada
+
+=item reset_queue
+
+yada yada
+
+=item term_flag
+
+yada yada
+
+=item threads_progress
+
+yada yada
+
+=item work_queue
+
+yada yada
+
+=back
+
 =cut
 

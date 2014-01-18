@@ -137,7 +137,7 @@ This overrides the weed_dups method in App::dupfind::Common
 Runs weed-out passes for same-size file groupings, using $weeder, where $weeder
 is a weed-out algorithm that tosses out non-dupes by use of more efficient
 means than hashing alone.  The idea is to read as little as possible from the
-disk while searching out dupes, and to use file hasing (digests) as a last
+disk while searching out dupes, and to use file hashing (digests) as a last
 resort.
 
 =back

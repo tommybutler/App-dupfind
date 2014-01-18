@@ -15,7 +15,7 @@ requires 'opts';
 
 sub _get_first_bytes
 {
-   my ( $self, $file, $len, $size ) = @_;
+   my ( $self, $file, $len ) = @_;
 
    my $buff;
 

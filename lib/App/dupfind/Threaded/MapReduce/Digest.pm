@@ -163,7 +163,7 @@ This overrides the digest_dups method in App::dupfind::Common
 Does the calculating of digests in order to determine uniqueness of files in
 a same-size file grouping, storing information in a shared hashref and
 recording statistics as it progresses.  A caching mechanism is used in order
-to avoid re-hashing of file content that has already been seen, yeilding a
+to avoid re-hashing of file content that has already been seen, yielding a
 very consequential performance gain.
 
 =back
