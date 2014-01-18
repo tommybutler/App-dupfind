@@ -16,7 +16,7 @@ then
    exit 1
 fi
 
-echo Really clear system-wide buffered and cached RAM? '(y/N)'
+echo -n Really clear system-wide buffered and cached RAM? '(y/N) '
 
 read confirm;
 
