@@ -63,6 +63,8 @@ exit usage() unless defined $opts->{dir};
 
 $opts->{threads} //= 0;
 
+$opts->{progress}  = 1 if $opts->{verbose};
+
 $opts->{remove}    = 1 if $opts->{prompt};
 
 $opts->{weed}      = 0 if $opts->{weed} =~ /^(n|no)$/i;
@@ -250,103 +252,12 @@ sub say_stderr { warn "$_\n" for @_ };
 
 # This is just the help message:
 
-sub usage { say_stderr <<'__USAGE__' }
-USAGE:
-   dupfind [ --options ] --dir ./path/to/search/
+sub usage
+{
+   require Pod::Usage;
 
-EXAMPLE:
-   dupfind --threads 4 --format robot --maxdepth 100 --bytes 1099511627776 --dir /dedup
-
-DESCRIPTION:
-   finds duplicate files in a directory tree.  Options are explained
-   in detail below.  Options marked with an asterisk (*) are not yet
-   implemented and are planned for a future release
-
-ARGUMENTS AND FLAGS:
-   -b, --bytes    Maximum file size in bytes that you are willing to compare.
-                  The current default maximum is 1 gigabyte.
-
-                  Sizing guide:
-                     1 kilobyte = 1024
-                     1 megabyte = 1048576        or 1024 ** 2
-                     1 gigabyte = 1073741824     or 1024 ** 3
-                     1 terabyte = 1099511627776  or 1024 ** 4
-
-   --cachestop    Integer indicating the maximum file size to put into the
-                  cache of computed file digests.  Note that this is NOT the
-                  max amount of RAM to consume for the cache. (see --ramcache)
-                  Default value: 1 megabyte
-
-   -d, --dir      Name of the directory you want to search for duplicates
-
-   -f, --format   Specify either "human" or "robot".  Human-readable output is
-                  generated for easy viewing by default.  If you want output
-                  that is machine-parseable, specify "robot"
-
-   -g, --progress Display a progress bar.  Why "-g"?  Because I ran out of "-p"s
-
-*  -l, --links    Follow symlinks (by default it does not).  Because this
-                  has some safety implications and is a complex matter,
-                  it is not yet supported.  Sorry, check back later.
-
-   -m, --maxdepth The maximum directory depth to which the comparison scan will
-                  recurse.  Note that this does not mean the total number of
-                  directories to scan.
-
-   -p, --prompt   Interactively prompt user to delete detected duplicates
-
-   --ramcache     Integer indicating the number of bytes of RAM to consume
-                  for the cache of computed file digests.  Note that dupfind
-                  will still use a substantial amount of memory for other
-                  internal purposes that don't have to do with the cache.
-                  Default: 100 megabytes.  Set to 0 to disable ram cache.
-
-   -x, --remove   CAUTION: Delete WITHOUT PROMPTING all but the first copy
-                  if duplicate files are found.  This will leave you with no
-                  duplicate files when execution is finished.
-
-   -t, --threads  Number of threads to use for file comparisons.  Defaults
-                  to 10, but lower numbers will do better on systems with
-                  fewer cores.  You'll usually get best performance using a
-                  number of threads equal to the number of logical processors
-                  on your system, plus 1.
-
-   -v, --verbose  Gives you a progress bar (like --progress) and some extra,
-                  helpful output if you need more detail about file dupes
-                  detected by dupfind.
-
-   -w, --weedout  Either yes or no.  (Default yes).  Tries to avoid unnecessary
-                  file hashing by weeding out potential duplicates with a
-                  simple, quick comparison of the last 1024 bytes of data in
-                  same-size files.  This typically produces very significant
-                  performance gains, especially with large numbers of files.
-
-   --wpass        One or more of the following "weeding" pass filters can be
-                  specified.  Weed-out passes reduce the amount of
-                  cryptographic digest calculations that must happen by
-                  weeding out potential-duplicates:
-
-                              first   (checks first few bytes of each file)
-                             middle   (checks the center-most single byte)
-                               last   (checks the last few bytes of files)
-                        middle_last   (checks middle byte and last few bytes)
-                  first_middle_last   (first bytes, middle byte, last bytes)
-
-                  The default is to only run the "first_middle_last" weed-out
-                  filter pass, which usually yields the best results in terms
-                  of speed.
-
-                  Weed-out filters are executed in the order you specify.
-
-                  Example usage: dupfind --wpass first --wpass last [...]
-
-   --wpsize       Integer indicating the number of bytes to read per file
-                  during a weed-out pass.  Default: 32.  If your weed-out
-                  pass type reads a file in two or more places, this value
-                  will be used for each read except "middle" reads, which
-                  are always 1 byte only.
-
-__USAGE__
+   Pod::Usage::pod2usage( { -exitval => 1, -verbose => 2 } )
+}
 
 __END__
 
@@ -354,11 +265,131 @@ __END__
 
 =head1 NAME
 
-dupfind - application to assist in the detection and deduplication of files
+dupfind - Helps detect and remove duplicate files
 
 =head1 DESCRIPTION
 
-yada yada
+Finds duplicate files in a directory tree.  Options are explained in detail
+below.  Options marked with an asterisk (*) are not yet implemented and are
+planned for a future release.
+
+=head1 SYNOPSIS
+
+   dupfind [ --options ] --dir ./path/to/search/
+
+   dupfind --threads 4 --maxdepth 100 --bytes 1099511627776 --dir /some/dir
+
+   dupfind --ramcache 0 --format robot --dir ~/dedup/this
+
+=head1 OPTIONS
+
+=over
+
+=item -b, --bytes
+
+Maximum file size in bytes that you are willing to compare.  The current default
+maximum is 1 gigabyte.
+
+   Sizing guide:
+      1 kilobyte = 1024
+      1 megabyte = 1048576        or 1024 ** 2
+      1 gigabyte = 1073741824     or 1024 ** 3
+      1 terabyte = 1099511627776  or 1024 ** 4
+
+=item --cachestop
+
+Integer indicating the maximum file size to put into the cache of computed
+file digests.  Note that this is NOT the max amount of RAM to consume for
+the cache. (see --ramcache) Default value: 1 megabyte
+
+=item -d, --dir
+
+Name of the directory you want to search for duplicates
+
+=item -f, --format
+
+Specify either "human" or "robot".  Human-readable output is generated for
+easy viewing by default.  If you want output that is machine-parsable,
+specify "robot"
+
+=item -g, --progress
+
+Display a progress bar.  Why "-g"?  Because I ran out of "-p"s
+
+=item -l, --symlinks
+
+*Follow symlinks (by default it does not).  Because this has some safety
+implications and is a complex matter, it is not yet supported.  Sorry,
+check back later.
+
+=item -m, --maxdepth
+
+The maximum directory depth to which the comparison scan will recurse.
+Note that this does not mean the total number of directories to scan.
+
+=item -p, --prompt
+
+Interactively prompt user to delete detected duplicates
+
+=item --ramcache
+
+Integer indicating the number of bytes of RAM to consume for the cache of
+computed file digests.  Note that dupfind will still use a substantial amount
+of memory for other internal purposes that don't have to do with the cache.
+Default: 100 megabytes.  Set to 0 to disable ram cache.
+
+=item -x, --remove
+
+CAUTION: Delete WITHOUT PROMPTING all but the first copy if duplicate files
+are found.  This will leave you with no duplicate files when execution is
+finished.
+
+=item -t, --threads
+
+Number of threads to use for file comparisons.  Defaults to 10, but lower
+numbers will do better on systems with fewer cores.  You'll usually get best
+performance on spindle devices by using a number of threads equal to the number
+of logical processors on your system, plus 1.
+
+=item -v, --verbose
+
+Gives you a progress bar (like --progress) and some extra, helpful output
+if you need more detail about file dupes detected by dupfind.
+
+=item -w, --weedout
+
+Either yes or no.  (Default yes).  Tries to avoid unnecessary file hashing by
+weeding out potential duplicates with a simple, quick comparison of the last
+1024 bytes of data in same-size files.  This typically produces very
+significant performance gains, especially with large numbers of files.
+
+=item --wpass
+
+One or more of the following "weeding" pass filters can be specified.  Weed-out
+passes reduce the amount of cryptographic digest calculations that must happen
+by weeding out potential-duplicates:
+
+               first   (checks first few bytes of each file)
+              middle   (checks the center-most single byte)
+                last   (checks the last few bytes of files)
+         middle_last   (checks middle byte and last few bytes)
+   first_middle_last   (first bytes, middle byte, last bytes)
+
+The default is to only run the "first_middle_last" weed-out filter pass, which
+usually yields the best results in terms of speed.
+
+Weed-out filters are executed in the order you specify.
+
+Example usage: dupfind --wpass first --wpass last [...]
+
+=item --wpsize
+
+Integer indicating the number of bytes to read per file during a weed-out pass.
+Default: 32.  If your weed-out pass type reads a file in two or more places,
+this value will be used for each read except "middle" reads, which are always
+1 byte only.
+
+=back
 
 =head1 COPYRIGHT
 
@@ -370,6 +401,6 @@ This library is free software, you may redistribute it and/or modify it
 under the same terms as Perl itself. For more details, see the full text of
 the LICENSE file that is included in this distribution.
 
-
 =cut
 
+__USAGE__

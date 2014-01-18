@@ -376,16 +376,22 @@ Retrieve information about cache hits/misses that happened during the
 calculation of file digests in the digest_dups method.  Used as part of the
 run summary that gets printed out at the end of execution of $bin/dupfind
 
+Returns $cache_hits, $cache_misses (both integers)
+
 =item count_dups
 
 Examines its argument and sums up the number of its members.  Expects a
 datastructure in the form of the master dupes hashref.
+
+Returns $dup_count (integer)
 
 =item delete_dups
 
 Deletes duplicate files, optionally prompting the user for which files to
 delete and for confirmation of deletion (if command-line parameters supplied
 by the user dictate that interactive prompting is desired)
+
+Returns nothing
 
 =item digest_dups
 
@@ -397,11 +403,18 @@ If ramcache is enabled (which is the default), a rudimentary caching mechanism
 is used in order to avoid calculating digests multiple times for files with
 the same content.
 
+Returns a lexical copy of the duplicates hashref with non-dupes removed
+
 =item get_size_dups
 
 Scans the directory specified by the user and assembles the master dupes
 hashref datastructure as described above.  Files with no same-size counterparts
 are not included in the datastructure.
+
+Returns $dupes_hashref, $scan_count, $size_dup_count ...
+...where $dupes_hashref is the master duplicates hashref, $scan_count is the
+number of files that were scanned, and $size_dup_count is the total number of
+same-size files encompassing each same-size group
 
 =item opts
 
@@ -439,6 +452,8 @@ were found during execution.  Currently two output formats are supported:
 while the human output is more visually palatable to human users (it makes
 sense to people).
 
+Returns the number of duplicates shown.
+
 =item sort_dups
 
 Expects a datastructure in the form of the master dupes hashref.
@@ -448,6 +463,8 @@ comprise its values.  It then sorts the listrefs in place with the following
 sort:
 
    sort { $a cmp $b }
+
+Returns a lexical copy of the newly-sorted master duplicates hashref
 
 =item toss_out_hardlinks
 
@@ -464,6 +481,8 @@ After alphabetizing any hard links that are detected, it throws out all hard
 links but the first one.  This simplifies the output, and the easy rationale
 behind this is that a hard link constitutes a file that has already been
 deduplicated because it refers to the same underlying storage.
+
+Returns a lexical copy of the master duplicates hashref
 
 =item weed_dups
 
@@ -482,6 +501,8 @@ the final decision on file uniqueness.
 One or more passes may be performed, based on user input.  Currently the
 default is to use only one pass, with the "first_middle_last" weed-out
 algorithm which has proved so far to be the most efficient.
+
+Returns a (hopefully reduced) lexical copy of the master duplicates hashref
 
 =back
 
