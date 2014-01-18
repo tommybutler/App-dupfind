@@ -1,0 +1,12 @@
+TODO List for App::dupfind
+
+Not necessarily listed in order of priority:
+
+1)  Create a CPAN distribution from the working codebase for "dupfind"
+
+2)  Reduce memory footprint
+
+3)  Add more digest algorithm options
+
+4)  Add more weed algorithm options, hopefully with at least 1 faster option
+    than the current performance leader ("first_middle_last")
