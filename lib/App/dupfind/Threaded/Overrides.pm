@@ -81,21 +81,38 @@ implemented by App::dupfind::Threaded::MapReduce
 
 Please don't use this module by itself.  It is for internal use only.
 
-=head1 METHODS
+Because there are no functional differences between these methods and the
+ones they override, please refer to the original documentation for them in
+the POD of these classes:
+
+=over
+
+=item *
+
+=back
+
+=head1 METHODS THIS CLASS OVERRIDES
 
 =over
 
 =item add_stats
 
-yada
+Not overridden, but necessary in order to implement the simple hashref of
+stats that is used in the non-threaded version in App::dupfind::Common.
+$self->add_stats allows App::dupfind::Threaded::MapReduce::Digest to
+accomplish the same thing, but in a thread-safe way.
+
+The stats mechanism is simply there to keep track of cache hits and misses
+while calculating file digests.
 
 =item sort_dups
 
-yada
+Overridden from App::dupfind::Common
 
 =item stats
 
-yada
+The sibling method to add_stats.  The same concept and description applies
+(see above).
 
 =back
 

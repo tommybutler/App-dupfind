@@ -25,59 +25,23 @@ __END__
 
 =head1 NAME
 
-App::dupfind - Composed class exposing the App::dupfind iface, used in $bin/dupfind
+App::dupfind - Composed class exposing the App::dupfind interface used in $bin/dupfind
 
 =head1 DESCRIPTION
 
-yada yada
-
-=head1 METHODS
+The real magic in this module takes place in the namespaces it subclasses and in
+the roles it consumes.  See the POD in the following modules to get the details
+of what this class actually does by virtue of inheritance:
 
 =over
 
-=item cache_stats
+=item *
 
-yada
+App::dupfind::Common
 
-=item count_dups
+=item *
 
-yada
-
-=item delete_dups
-
-yada
-
-=item digest_dups
-
-yada
-
-=item get_size_dups
-
-yada
-
-=item opts
-
-yada
-
-=item say_stderr
-
-yada
-
-=item show_dups
-
-yada
-
-=item sort_dups
-
-yada
-
-=item toss_out_hardlinks
-
-yada
-
-=item weed_dups
-
-yada
+App::dupfind::Guts
 
 =back
 

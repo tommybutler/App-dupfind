@@ -33,7 +33,29 @@ App::dupfind::Threaded - Composed class providing seamless threading support for
 
 =head1 DESCRIPTION
 
-yada yada
+The real magic in this module takes place in the namespaces it subclasses and in
+the roles it consumes.  See the POD in the following modules to get the details
+of what this class actually does by virtue of inheritance:
+
+=over
+
+=item *
+
+App::dupfind::Threaded::ThreadManagement
+
+=item *
+
+App::dupfind::Threaded::MapReduce (this one is of particular interest)
+
+=item *
+
+App::dupfind::Threaded::MapReduce::Weed
+
+=item *
+
+App::dupfind::Threaded::MapReduce::Digest
+
+=back
 
 =cut
 

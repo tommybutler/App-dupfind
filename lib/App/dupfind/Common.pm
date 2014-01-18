@@ -48,7 +48,9 @@ sub get_size_dups
          recurse => 1,
          callback => sub
             {
-               my ( $selfdir, $subdirs, $files ) = @_;
+               ## my ( $selfdir, $subdirs, $files ) = @_;
+
+               my $files = $_[2]; # save two vars
 
                $scan_count += @$files;
 

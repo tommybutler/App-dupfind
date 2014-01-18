@@ -193,5 +193,38 @@ regard to cache hits/misses during the digest_dups phase)
 
 =back
 
+=head1 METHODS
+
+=over
+
+=item _plan_weed_passes
+
+Based on either or both the default settings and the user-specified weed-out
+algorithms to run on potential duplicates before resorting to calculating
+digests, this private method builds the ordered execution plan which is then
+caried out by $self->_pull_weeds
+
+=item _pull_weeds
+
+Runs the weed-out passes against the datastructure containing the list of
+potential file duplicates.  A weed-out pass is simply the implementation of
+a particular algorithm that can be run against a file or files in order to
+determine the uniqueness of a file.
+
+Weeding is typically much more efficient than calculating the digests of files
+and so these digests are only calculated as a last resort.  Weeding out files
+doesn't always get rid of all potential duplicates.  When it doesn't, that's
+when you either (based on user input) run another different type of weeding
+algorithm or fall back directly on file hashing (digests).
+
+=item _do_weed_pass
+
+Runs a single given weed-out pass against the list of potential file duplicates.
+
+Keeps track of how many files it has scanned, how many non-duplicates it ruled
+out, and how many potential duplicates remain.
+
+=back
+
 =cut
 
