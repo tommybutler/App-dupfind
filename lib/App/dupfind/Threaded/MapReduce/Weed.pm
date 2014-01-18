@@ -119,5 +119,28 @@ of potential duplicates (or no duplicates if none were left after the weeding-ou
 
 Please don't use this module by itself.  It is for internal use only.
 
+=head1 METHODS
+
+=over
+
+=item weed_dups
+
+Calls the map-reduce logic on the $size_dups hashref, providing a wrapped
+coderef calling out to _weed_worker for every weeding algorithm that has been
+specified by the user.  The coderef mappings are then invoked by the map-reduce
+engine for same-size size file groupings
+
+This overrides the weed_dups method in App::dupfind::Common
+
+=item _weed_worker
+
+Runs weed-out passes for same-size file groupings, using $weeder, where $weeder
+is a weed-out algorithm that tosses out non-dupes by use of more efficient
+means than hashing alone.  The idea is to read as little as possible from the
+disk while searching out dupes, and to use file hasing (digests) as a last
+resort.
+
+=back
+
 =cut
 

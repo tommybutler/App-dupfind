@@ -325,5 +325,9 @@ Together with App::dupfind::Guts, the methods from this module are composed into
 the App::dupfind class in order to provide the user with the high-level methods
 that are directly callable from the user's application
 
+The methods here which are subclassed by App::dupfind are covered in the
+the documentation for that module, since they are meant for consumption by the
+user at that layer.
+
 =cut
 

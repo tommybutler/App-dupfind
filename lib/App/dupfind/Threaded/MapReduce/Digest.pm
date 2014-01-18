@@ -146,5 +146,27 @@ outcome of that multithreaded map-reduce operation is a list of true duplicates
 
 Please don't use this module by itself.  It is for internal use only.
 
+=head1 METHODS
+
+=over
+
+=item digest_dups
+
+Calls the map-reduce logic on the $size_dups hashref, providing a wrapped
+coderef calling out to _digest_worker that will be invoked by the map-reduce
+engine for same-size size file groupings
+
+This overrides the digest_dups method in App::dupfind::Common
+
+=item _digest_woker
+
+Does the calculating of digests in order to determine uniqueness of files in
+a same-size file grouping, storing information in a shared hashref and
+recording statistics as it progresses.  A caching mechanism is used in order
+to avoid re-hashing of file content that has already been seen, yeilding a
+very consequential performance gain.
+
+=back
+
 =cut
 
