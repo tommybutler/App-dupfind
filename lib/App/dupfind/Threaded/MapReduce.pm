@@ -1,3 +1,5 @@
+# ABSTRACT: Basic, abstracted implementation of map-reduce for threaded tasks
+
 use strict;
 use warnings;
 
@@ -76,3 +78,23 @@ sub reducer
 __PACKAGE__->meta->make_immutable;
 
 1;
+
+__END__
+
+=pod
+
+=head1 NAME
+
+App::dupfind::Threaded::MapReduce - Basic, abstracted implementation of map-reduce for threaded tasks
+
+=head1 DESCRIPTION
+
+App::dupfind implements a simple map-reduce feature when threading is used
+and takes same-size file groups and processes them in parallel, each grouping
+forming a task mapping that is then reduced upon completion to only the files
+that are truly duplicates.
+
+Please don't use this module by itself.  It is for internal use only.
+
+=cut
+

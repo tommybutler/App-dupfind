@@ -1,3 +1,5 @@
+# ABSTRACT: Thread management logic, abstracted safely away in its own namespace
+
 use strict;
 use warnings;
 
@@ -31,7 +33,7 @@ with 'App::dupfind::Threaded::Overrides';
 
 has work_queue => ( is => 'rw', default => sub { Thread::Queue->new } );
 
-before threads_progress => sub { eval 'use Term::ProgressBar' };
+before threads_progress => sub { require Term::ProgressBar };
 
 
 sub mapped { $mapped }
@@ -164,3 +166,23 @@ sub threads_progress
 __PACKAGE__->meta->make_immutable;
 
 1;
+
+__END__
+
+=pod
+
+=head1 NAME
+
+App::dupfind::Threaded::ThreadManagement - Thread management logic, abstracted safely away in its own namespace
+
+=head1 DESCRIPTION
+
+Safely tucks away the management of threads and all the threading logic
+that makes the Map-Reduce feature of App::dupfind possible.  Thanks goes
+out to BrowserUk at perlmonks.org who helped me get this code on the right
+track.
+
+Please don't use this module by itself.  It is for internal use only.
+
+=cut
+

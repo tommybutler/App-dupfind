@@ -18,10 +18,10 @@ with 'App::dupfind::Guts';
 
 before [ qw/ weed_dups digest_dups / ] => sub
 {
-   eval 'use Term::ProgressBar' if shift->opts->{progress}
+   require Term::ProgressBar if shift->opts->{progress}
 };
 
-before delete_dups => sub { eval 'use Term::Prompt' };
+before delete_dups => sub { require Term::Prompt };
 
 
 sub count_dups
@@ -310,3 +310,20 @@ sub say_stderr { shift; chomp for @_; warn "$_\n" for @_ };
 __PACKAGE__->meta->make_immutable;
 
 1;
+
+__END__
+
+=pod
+
+=head1 NAME
+
+App::dupfind::Common - Public methods for the App::dupfind deduplication engine
+
+=head1 DESCRIPTION
+
+Together with App::dupfind::Guts, the methods from this module are composed into
+the App::dupfind class in order to provide the user with the high-level methods
+that are directly callable from the user's application
+
+=cut
+

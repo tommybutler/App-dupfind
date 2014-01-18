@@ -160,3 +160,22 @@ sub _pull_weeds
 }
 
 1;
+
+__END__
+
+=pod
+
+=head1 NAME
+
+App::dupfind::Guts - Private methods supporting the App::dupfind::Common public interface
+
+=head1 DESCRIPTION
+
+These are private methods that are the underpinnings of the more friendly,
+high-level public methods in App::dupfind::Common, which is where you should go
+if you're searching for documentation on the App::dupfind namespace.
+
+Please don't use this module by itself.  It is for internal use only.
+
+=cut
+

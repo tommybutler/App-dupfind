@@ -62,3 +62,24 @@ sub sort_dups
 }
 
 1;
+
+__END__
+
+=pod
+
+=head1 NAME
+
+App::dupfind::Threaded::Overrides - Methods and attributes that have to be overridden when threading
+
+=head1 DESCRIPTION
+
+Some of the methods in App::dupfind::Common and App::dupfind::Guts need to
+be overridden here in order to make thread-safe versions of them, and/or
+versions of the methods that implement support for shared variables that
+will be passed around between threads during the map-reduce operations
+implemented by App::dupfind::Threaded::MapReduce
+
+Please don't use this module by itself.  It is for internal use only.
+
+=cut
+

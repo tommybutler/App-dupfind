@@ -347,3 +347,29 @@ ARGUMENTS AND FLAGS:
                   are always 1 byte only.
 
 __USAGE__
+
+__END__
+
+=pod
+
+=head1 NAME
+
+dupfind - application to assist in the detection and deduplication of files
+
+=head1 DESCRIPTION
+
+yada yada
+
+=head1 COPYRIGHT
+
+Copyright(C) 2013-2014, Tommy Butler.  All rights reserved.
+
+=head1 LICENSE
+
+This library is free software, you may redistribute it and/or modify it
+under the same terms as Perl itself. For more details, see the full text of
+the LICENSE file that is included in this distribution.
+
+
+=cut
+

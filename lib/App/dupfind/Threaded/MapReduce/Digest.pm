@@ -1,3 +1,5 @@
+# ABSTRACT: Map-reduce version of digest_dups method and worker thread for it
+
 use strict;
 use warnings;
 
@@ -124,3 +126,25 @@ sub _digest_worker
 }
 
 1;
+
+__END__
+
+=pod
+
+=head1 NAME
+
+App::dupfind::Threaded::MapReduce::Digest - Map-reduce version of digest_dups method and worker thread for it
+
+=head1 DESCRIPTION
+
+Overrides the digest_dups method from App::dupfind::Common and implements an worker
+thread routine that is invoked therein.  In this threaded version of digest_dups,
+the set of same-size file groupings is mapped as a task and sent to the main
+map reducer logic engine implemented in App::dupfind::Threaded::MapReduce.  The
+outcome of that multithreaded map-reduce operation is a list of true duplicates
+(or no duplicates if none were found).
+
+Please don't use this module by itself.  It is for internal use only.
+
+=cut
+

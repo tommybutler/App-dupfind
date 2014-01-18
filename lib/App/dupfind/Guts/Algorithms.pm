@@ -160,3 +160,23 @@ sub _get_bytes_n_offset_n
 }
 
 1;
+
+__END__
+
+=pod
+
+=head1 NAME
+
+App::dupfind::Guts::Algorithms - The private weeding algorithms available for use by public interface
+
+=head1 DESCRIPTION
+
+Unless you're contributing to the codebase, don't go poking around here.
+This is a private namespace that implements the algorithms that are exposed
+to the user in the application interface, which is where you should go
+looking if you are searching for algorithms to use for weeding-out dupes.
+
+Please don't use this module by itself.  It is for internal use only.
+
+=cut
+

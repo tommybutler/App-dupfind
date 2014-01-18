@@ -1,3 +1,5 @@
+# ABSTRACT: Map-reduce version of weed_dups, and the worker thread for it
+
 use strict;
 use warnings;
 
@@ -97,3 +99,25 @@ sub _weed_worker
 }
 
 1;
+
+__END__
+
+=pod
+
+=head1 NAME
+
+App::dupfind::Threaded::MapReduce::Weed - Map-reduce version of weed_dups, and the worker thread for it
+
+=head1 DESCRIPTION
+
+Overrides the weed_dups method from App::dupfind::Common and implements an worker
+thread routine that is invoked therein.  In this threaded version of weed_dups,
+the set of same-size file groupings is mapped as a task and sent to the main
+map reducer logic engine implemented in App::dupfind::Threaded::MapReduce.  The
+outcome of that multithreaded map-reduce operation is a significantly smaller list
+of potential duplicates (or no duplicates if none were left after the weeding-out).
+
+Please don't use this module by itself.  It is for internal use only.
+
+=cut
+
