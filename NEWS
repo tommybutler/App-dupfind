@@ -1,5 +1,9 @@
 NEWS for App::dupfind
 
+2014-01-20
+   Moved the logic out of the dupfind script into a more easily-testable
+   module (modulino style), and modified dupfind to use it.
+
 2014-01-17
    App::dupfind is born from Tommy Butler's "dupfind" codebase, a
    tuned, enhanced, and extended version of the baseline reference code
