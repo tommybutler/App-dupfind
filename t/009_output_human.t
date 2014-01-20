@@ -43,6 +43,6 @@ my $output = $f->load_file( $fn );
 
 unlink $fn;
 
-is $output, $solution, 'robot format output gives correct solution';
+is $output, $solution, 'human format output gives correct solution';
 
 exit;
