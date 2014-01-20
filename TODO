@@ -2,7 +2,7 @@ TODO List for App::dupfind
 
 Not necessarily listed in order of priority:
 
-1)  Create a CPAN distribution from the working codebase for "dupfind"
+1)  DONE: Create a CPAN distribution from the working codebase for "dupfind"
 
 2)  Reduce memory footprint
 
@@ -10,3 +10,7 @@ Not necessarily listed in order of priority:
 
 4)  Add more weed algorithm options, hopefully with at least 1 faster option
     than the current performance leader ("first_middle_last")
+
+5)  Make a more flexible way of deleting duplicates
+
+6)  Make an option to not ignore hardlinks
