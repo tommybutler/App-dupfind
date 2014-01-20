@@ -86,9 +86,13 @@ sub _do_weed_pass
 
    $dup_count  = $new_count;
 
-   $self->say_stderr( <<__WEED_PASS__ );
-      ...ELIMINATED $difference NON-DUPS IN PASS #$pass_count. $new_count REMAIN
-__WEED_PASS__
+   $self->say_stderr
+   (
+      sprintf '      ...ELIMINATED %d NON-DUPS IN PASS #%d. %d REMAIN',
+         $difference,
+         $pass_count,
+         $new_count
+   );
 
    return $size_dups;
 }
