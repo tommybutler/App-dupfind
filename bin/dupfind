@@ -1,263 +1,15 @@
 #!/usr/bin/env perl
 
-# ABSTRACT: The implementation of App::dupfind (this script does the work)
+# ABSTRACT: The script. It calls App::dupfind::App->run which does all the work
 
 use strict;
 use warnings;
 
-use 5.010;
-
-BEGIN { STDERR->autoflush; STDOUT->autoflush; }
-
-use Getopt::Long;
-use Benchmark ':hireswallclock';
-
 use lib 'lib';
 
-use App::dupfind;
-use App::dupfind::Threaded;
+use App::dupfind::App;
 
-use subs 'say_stderr';
-
-my $opts =
-{
-   bytes     => 1024 ** 3,           # 1 GB max read
-   cachestop => ( 1024 ** 2 ) * 2,   # 2 MB file size limit on cache candidacy
-   dir       => undef,
-   format    => 'human',             # options are "human" or "robot"
-   help      => undef,
-   links     => 0,
-   maxdepth  => 50,
-   progress  => 0,
-   prompt    => 0,
-   ramcache  => ( 1024 ** 2 ) * 300, # 300 MB default cache size
-   remove    => 0,
-   threads   => 0,
-   verbose   => 0,
-   weed      => 1,
-   wpass     => [ ],
-   wpsize    => 32,
-};
-
-GetOptions
-(
-   'bytes|b=i'    => \$opts->{bytes},
-   'cachestop=i'  => \$opts->{cachestop},
-   'dir|d=s'      => \$opts->{dir},
-   'format|f=s'   => \$opts->{format},
-   'help|h|?'     => \$opts->{help},
-   'links|l'      => \$opts->{links},
-   'maxdepth|m=i' => \$opts->{maxdepth},
-   'progress'     => \$opts->{progress},
-   'prompt|p'     => \$opts->{prompt},
-   'ramcache=i'   => \$opts->{ramcache},
-   'remove|x'     => \$opts->{remove},
-   'threads|t=i'  => \$opts->{threads},
-   'verbose|v'    => \$opts->{verbose},
-   'weedout|w=s'  => \$opts->{weed},
-   'wpass=s'      =>  $opts->{wpass},
-   'wpsize=i'     => \$opts->{wpsize},
-) or exit usage();
-
-exit usage() unless defined $opts->{dir};
-
-$opts->{threads} //= 0;
-
-$opts->{progress}  = 1 if $opts->{verbose};
-
-$opts->{remove}    = 1 if $opts->{prompt};
-
-$opts->{weed}      = 0 if $opts->{weed} =~ /^(n|no)$/i;
-
-$opts->{weed}      = 1 if !! @{ $opts->{wpass} };
-
-$opts->{wpass}     = [ 'first_middle_last' ]
-   if $opts->{weed} && ! @{ $opts->{wpass} };
-
-die 'Bogus cache parameters provided!  Just use the defaults buddy.'
-   if $opts->{cachestop} < 0 || $opts->{ramcache} < 0;
-
-die 'Inappropriate cachestop size; must be a small fraction of total ramcache.'
-   if $opts->{ramcache} && $opts->{cachestop} > ( $opts->{ramcache} / 100 );
-
-$opts->{cachesize} = int ( $opts->{ramcache} / $opts->{cachestop} );
-
-my $fdf = $opts->{threads}
-   ? App::dupfind::Threaded->new( opts => $opts )
-   : App::dupfind->new( opts => $opts );
-
-my $benchmarks =
-{
-   scanfs   => { },
-   prune    => { },
-   weed     => { },
-   digest   => { },
-   remove   => { },
-   run      => { },
-};
-
-my ( $scan_count, $size_dup_count, $dup_count ) = run();
-
-my ( $cache_hits, $cache_misses ) = $fdf->cache_stats;
-
-say_stderr <<__SUMMARY__;
-------------------------------
-** THREADS...............$opts->{threads}
-** RAM CACHE.............$opts->{ramcache} bytes
-** CACHE HITS/MISSES.....$cache_hits/$cache_misses
-** TOTAL FILES SCANNED...$scan_count
-** TOTAL SAME SIZE.......$size_dup_count
-** TOTAL ACTUAL DUPES....$dup_count
-      -- TIMES --
-** TREE SCAN TIME........$benchmarks->{scanfs}->{result}
-** HARDLINK PRUNE TIME...$benchmarks->{prune}->{result}
-** WEED-OUT TIME.........$benchmarks->{weed}->{result}
-** CRYPTO-HASHING TIME...$benchmarks->{digest}->{result}
-** DELETION TIME.........$benchmarks->{remove}->{result}
-** TOTAL RUN TIME........$benchmarks->{run}->{result}
-__SUMMARY__
-
-exit;
-
-sub run
-{
-   bench_this( run => 'start' );
-
-   my ( $size_dups, $scan_count, $size_dup_count ) = scanfs();
-
-   $size_dups = prune( $size_dups );
-
-   $size_dups = weed( $size_dups ) if $opts->{weed};
-
-   my $digest_dups = digest( $size_dups );
-
-   undef $size_dups; # free up some RAM
-
-   say_stderr '** DISPLAYING OUTPUT'; say_stderr '-' x 30;
-
-   my $dup_count = $fdf->show_dups( $digest_dups );
-
-   delete_dups( $digest_dups ) if $opts->{remove};
-
-   bench_this( run => 'end' );
-
-   calculate_bench_times();
-
-   return $scan_count, $size_dup_count, $dup_count;
-}
-
-sub scanfs
-{
-   say_stderr '** SCANNING ALL FILES FOR SIZE DUPLICATES';
-
-   bench_this( scanfs => 'start' );
-
-   my ( $size_dups, $scan_count, $size_dup_count ) = $fdf->get_size_dups();
-
-   bench_this( scanfs => 'end' );
-
-   say '** NO DUPLICATES FOUND' and exit unless keys %$size_dups;
-
-   return $size_dups, $scan_count, $size_dup_count;
-}
-
-sub prune
-{
-   my $size_dups = shift;
-
-   say_stderr '** PRUNING HARD LINKS';
-
-   bench_this( prune => 'start' );
-
-   $size_dups = $fdf->toss_out_hardlinks( $size_dups );
-
-   bench_this( prune => 'end' );
-
-   say_stderr '** NO DUPLICATES FOUND' and exit unless keys %$size_dups;
-
-   return $size_dups;
-}
-
-sub weed
-{
-   my $size_dups = shift;
-
-   say_stderr '** WEEDING-OUT FILES THAT ARE OBVIOUSLY DIFFERENT';
-
-   bench_this( weed => 'start' );
-
-   $size_dups = $fdf->weed_dups( $size_dups );
-
-   bench_this( weed => 'end' );
-
-   say_stderr '** NO DUPLICATES FOUND' and exit unless keys %$size_dups;
-
-   return $size_dups;
-}
-
-sub digest
-{
-   my $size_dups = shift;
-
-   say_stderr '** CHECKSUMMING SIZE DUPLICATES';
-
-   bench_this( digest => 'start' );
-
-   my $digest_dups = $fdf->digest_dups( $size_dups );
-
-   bench_this( digest => 'end' );
-
-   say_stderr '** NO DUPLICATES FOUND' and exit unless keys %$digest_dups;
-
-   return $digest_dups;
-}
-
-sub delete_dups
-{
-   my $digests = shift;
-
-   bench_this( remove => 'start' );
-
-   $fdf->delete_dups( $digests );
-
-   bench_this( remove => 'end' );
-}
-
-sub bench_this
-{
-   my ( $mark, $start_end ) = @_;
-
-   $benchmarks->{ $mark }->{ $start_end } = Benchmark->new();
-}
-
-sub calculate_bench_times
-{
-   for my $mark ( keys %$benchmarks )
-   {
-      next unless $benchmarks->{ $mark }->{start};
-
-      $benchmarks->{ $mark }->{result} =
-         timestr timediff
-         (
-            $benchmarks->{ $mark }->{end},
-            $benchmarks->{ $mark }->{start}
-         );
-   }
-
-   $benchmarks->{weed}->{result}   ||= 'did not weed';
-   $benchmarks->{remove}->{result} ||= 'no deletions';
-}
-
-sub say_stderr { warn "$_\n" for @_ };
-
-# This is just the help message:
-
-sub usage
-{
-   require Pod::Usage;
-
-   Pod::Usage::pod2usage( { -exitval => 1, -verbose => 2 } )
-}
+App::dupfind::App->run;
 
 __END__
 
@@ -346,10 +98,12 @@ finished.
 
 =item -t, --threads
 
-Number of threads to use for file comparisons.  Defaults to 10, but lower
-numbers will do better on systems with fewer cores.  You'll usually get best
-performance on spindle devices by using a number of threads equal to the number
-of logical processors on your system, plus 1.
+Number of threads to use for file comparisons.  Defaults to 0, or non-threaded.
+
+You'll often get best performance on spindle devices by using a number of
+threads equal to the number of logical processors on your system, plus 1.
+
+See CAVEATS for important info about threads.
 
 =item -v, --verbose
 
@@ -388,6 +142,31 @@ Integer indicating the number of bytes to read per file during a weed-out pass.
 Default: 32.  If your weed-out pass type reads a file in two or more places,
 this value will be used for each read except "middle" reads, which are always
 1 byte only.
+
+=back
+
+=head1 CAVEATS:
+
+=over
+
+=item *
+
+Your Perl has to support threading to use the --threads option.
+
+=item *
+
+Deduplication is resource-intensive, and threading has a multiplier effect.
+The more threads you use, the more RAM will be consumed.  If you are calling
+dupfind on a very large directory, you could risk running out of RAM.
+
+An example of such a scenario would be to run dupfind with 8 threads against
+a 100 gigabyte directory containing 2 million files on a machine with only 2
+GB of RAM.  That will almost certainly run out of memory.
+
+=item *
+
+You should avoid attempting to run dupfind against very large volumes with
+several millions of files unless you have a lot of RAM, CPU, and time.
 
 =back
 
