@@ -1,6 +1,10 @@
 NEWS for App::dupfind
 
 2014-01-20
+   Finished test suite.  The dist is just about CPAN-ready now.  Putting
+   on the finishing touches and then will be sending it up to PAUSE.
+
+2014-01-20 (very early morning)
    Moved the logic out of the dupfind script into a more easily-testable
    module (modulino style), and modified dupfind to use it.
 
