@@ -17,7 +17,7 @@ __END__
 
 =head1 NAME
 
-dupfind - Helps detect and remove duplicate files
+dupfind - Detect and optionally remove duplicate files
 
 =head1 DESCRIPTION
 
@@ -157,7 +157,8 @@ this value will be used for each read except "middle" reads, which are always
 
 =item *
 
-Your Perl has to support threading to use the --threads option.
+Your Perl needs to be version 5.010 or better and has to support threading if
+you want to use the --threads option.
 
 =item *
 
@@ -175,6 +176,10 @@ You should avoid attempting to run dupfind against very large volumes with
 several millions of files unless you have a lot of RAM, CPU, and time.
 
 =back
+
+=head1 SUPPORT
+
+To contact the author, visit http://www.atrixnet.com/contact and leave a message
 
 =head1 COPYRIGHT
 
