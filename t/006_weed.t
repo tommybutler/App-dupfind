@@ -5,11 +5,11 @@ use warnings;
 use Test::More tests => 2;
 use Test::NoWarnings;
 
-use Storable;
+use File::Util;
 
 use lib 'lib';
 
-my $solution = retrieve( 't/solutions/006_weed.solution' );
+my $solution = eval File::Util->new->load_file( 't/solutions/006_weed.pl' );
 
 BEGIN { @ARGV = qw( --quiet --dir t/data ) }
 
@@ -26,4 +26,3 @@ $size_dups = $app->deduper->sort_dups( $weed_dups );
 is_deeply $size_dups, $solution, 'weed returns correct datastructure';
 
 exit;
-

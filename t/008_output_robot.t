@@ -13,7 +13,7 @@ use lib 'lib';
 my $f  = File::Util->new();
 my $fn = tmpnam(); # get absolute filename
 
-my $solution = 't/solutions/008_output_robot.thawed';
+my $solution = 't/solutions/008_output_robot.txt';
    $solution = $f->load_file( $solution );
 
 BEGIN { @ARGV = qw( --quiet --format robot --dir t/data ) }

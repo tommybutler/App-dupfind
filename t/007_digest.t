@@ -9,7 +9,7 @@ use Storable;
 
 use lib 'lib';
 
-my $solution = retrieve( 't/solutions/007_digest.solution' );
+my $solution = eval File::Util->new->load_file( 't/solutions/007_digest.pl' );
 
 BEGIN { @ARGV = qw( --quiet --dir t/data ) }
 
