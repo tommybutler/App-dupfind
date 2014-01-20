@@ -83,6 +83,12 @@ Note that this does not mean the total number of directories to scan.
 
 Interactively prompt user to delete detected duplicates
 
+=item -q, --quiet
+
+Provide no status messages prior to, and no summary messages after output.
+
+Also turns off progress bar.
+
 =item --ramcache
 
 Integer indicating the number of bytes of RAM to consume for the cache of

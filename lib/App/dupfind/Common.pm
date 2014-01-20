@@ -307,7 +307,7 @@ sub cache_stats
           $self->stats->{cache_misses}
 }
 
-sub say_stderr { shift; chomp for @_; warn "$_\n" for @_ };
+sub say_stderr { return if shift->opts->{quiet}; warn "$_\n" for @_ };
 
 __PACKAGE__->meta->make_immutable;
 

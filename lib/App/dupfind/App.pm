@@ -118,6 +118,7 @@ sub _build_opts
       maxdepth  => 50,
       progress  => 0,
       prompt    => 0,
+      quiet     => 0,
       ramcache  => ( 1024 ** 2 ) * 300, # 300 MB default cache size
       remove    => 0,
       threads   => 0,
@@ -138,6 +139,7 @@ sub _build_opts
       'maxdepth|m=i' => \$opts->{maxdepth},
       'progress'     => \$opts->{progress},
       'prompt|p'     => \$opts->{prompt},
+      'quiet|q'      => \$opts->{quiet},
       'ramcache=i'   => \$opts->{ramcache},
       'remove|x'     => \$opts->{remove},
       'threads|t=i'  => \$opts->{threads},
@@ -330,7 +332,7 @@ sub remove
    $self->_bench_this( remove => 'end' );
 }
 
-sub _stderr { shift; warn "$_\n" for @_ };
+sub _stderr { return if shift->opts->{quiet}; warn "$_\n" for @_ };
 
 __PACKAGE__->meta->make_immutable;
 
@@ -471,12 +473,32 @@ example, collisions are possible but extremely unlikely.
 =item remove
 
 Runs a removal (deletion) sequence on file duplicates obtained by $self->digest,
- interactively prompting the user for confirmation of deletions.  Interactive
+interactively prompting the user for confirmation of deletions.  Interactive
 prompting does not happen if the user specified that prompting should be
 disabled.
 
 Refer to the help documentation in the dupfind executable proper for an
 explanation on run time command line options and switches.
+
+=item _stderr
+
+Works like Perl's built-in say function, except:
+
+=over
+
+=item *
+
+Output goes to STDERR
+
+=item *
+
+It is a class method.  You will have to call it like $object->_stderr( 'foo' );
+
+=item *
+
+IT OUTPUTS NOTHING if the user passed in the "-q" or "--quiet" flag.
+
+=back
 
 =back
 
