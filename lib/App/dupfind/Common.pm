@@ -270,7 +270,7 @@ sub delete_dups
    {
       my $group = $digests->{ $digest };
 
-      say sprintf 'KEPT    (%s) %s', $digest, $group->[0];
+      say sprintf 'ORIGINAL (%s) %s', $digest, $group->[0];
 
       shift @$group;
 
@@ -278,9 +278,9 @@ sub delete_dups
       {
          if ( $self->opts->{prompt} )
          {
-            unless ( Term::Prompt->prompt( 'y', "REMOVE DUPE? $dup", '', 'n' ) )
+            unless ( Term::Prompt::prompt( 'y', "REMOVE DUPE? $dup", '', 'n' ) )
             {
-               say sprintf 'KEPT    (%s) %s', $digest, $dup;
+               say sprintf 'KEPT     (%s) %s', $digest, $dup;
 
                next;
             }
@@ -290,7 +290,7 @@ sub delete_dups
 
          $removed++;
 
-         say sprintf 'REMOVED (%s) %s', $digest, $dup;
+         say sprintf 'REMOVED  (%s) %s', $digest, $dup;
       }
 
       say '--';
