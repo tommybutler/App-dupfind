@@ -25,13 +25,27 @@ __END__
 
 =head1 NAME
 
-App::dupfind - Composed class exposing the App::dupfind interface used in $bin/dupfind
+App::dupfind - A Composed class that provides core functionality to the app
 
 =head1 DESCRIPTION
 
+=head2 The Application Code
+
+This module together with its companion, App::dupfind::Threaded, are used
+directly by App::dupfind::App (the application code).  You can look at its POD
+if you want to know more about how the app works internally.
+
+=head2 The Executable
+
+The application gets run() in the installed, callable script: dupfind.  You can
+look at the POD for the dupfind script if you want details on how the script
+can help you and what command parameters it takes.
+
+=head2 The Internals
+
 The real magic in this module takes place in the namespaces it subclasses and in
 the roles it consumes.  See the POD in the following modules to get the details
-of what this class actually does by virtue of inheritance:
+on the deep internals of what this class actually does by virtue of inheritance:
 
 =over
 
