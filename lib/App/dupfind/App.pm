@@ -5,7 +5,7 @@ use warnings;
 
 package App::dupfind::App;
 
-BEGIN { STDERR->autoflush; STDOUT->autoflush; }
+BEGIN { select STDERR; $|++; select STDOUT; $|++; }
 
 use 5.010;
 

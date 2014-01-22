@@ -1,6 +1,10 @@
 Revision history for Perl extension App::dupfind
 
-0.140200 2014-01-20
+0.140230-TRIAL 2014-01-22
+ - Fix bug that made older Perls unable to run the executable (versions
+   previous to 5.014 failed)
+
+0.140200-TRIAL 2014-01-20
  - App::dupfind is CPAN-ready, at least as a TRIAL dist.  It now contains
    a decent test suite in addition to its script.  The documentation may
    need more finishing touches, but is quite extensive as is.
