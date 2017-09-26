@@ -1,5 +1,11 @@
 NEWS for App::dupfind
 
+2017-09-25
+   After fixing a bug introduced by updates to a dependency library's API,
+   I realized that 3 years on the CPAN as a 'TRIAL' distro, and with a
+   handful of forks of the code on github, the code has proven both stable
+   and useful to others and should be released as a formal dist.
+
 2014-01-20
    Finished test suite.  The dist is just about CPAN-ready now.  Putting
    on the finishing touches and then will be sending it up to PAUSE.

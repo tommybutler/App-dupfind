@@ -61,7 +61,7 @@ App::dupfind::Guts
 
 =head1 COPYRIGHT
 
-Copyright(C) 2013-2014, Tommy Butler.  All rights reserved.
+Copyright(C) 2013-2017, Tommy Butler.  All rights reserved.
 
 =head1 LICENSE
 
