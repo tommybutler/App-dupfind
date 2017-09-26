@@ -13,7 +13,7 @@ use threads::shared;
 use Moo::Role;
 
 use Time::HiRes 'usleep';
-use Digest::xxHash 'xxhash_hex';
+use Digest::xxHash 'xxhash64_hex';
 
 requires 'opts';
 
@@ -28,7 +28,7 @@ sub digest_dups
 
    # don't bother to hash zero-size files
 
-   my $zero_digest = xxhash_hex '', 0;
+   my $zero_digest = xxhash64_hex '', 0;
 
    my $zero_files  = delete $size_dups->{0};
 
@@ -95,7 +95,7 @@ sub _digest_worker
             {
                if ( $cache_size < $max_cache && $size <= $cache_stop )
                {
-                  $digest_cache->{ $data } = $digest = xxhash_hex $data, 0;
+                  $digest_cache->{ $data } = $digest = xxhash64_hex $data, 0;
 
                   $cache_size++;
 
@@ -103,13 +103,13 @@ sub _digest_worker
                }
                else
                {
-                  $digest = xxhash_hex $data, 0;
+                  $digest = xxhash64_hex $data, 0;
                }
             }
          }
          else
          {
-            $digest = xxhash_hex $data, 0;
+            $digest = xxhash64_hex $data, 0;
          }
 
          $self->push_mapped( $digest => $file );

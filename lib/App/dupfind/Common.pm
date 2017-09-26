@@ -8,7 +8,7 @@ package App::dupfind::Common;
 use 5.010;
 
 use Moo;
-use Digest::xxHash 'xxhash_hex';
+use Digest::xxHash 'xxhash64_hex';
 
 use lib 'lib';
 
@@ -124,7 +124,7 @@ sub digest_dups
    my $cache_misses  = 0;
 
    # don't bother to hash zero-size files
-   $digests->{ xxhash_hex '', 0 } = delete $size_dups->{0}
+   $digests->{ xxhash64_hex '', 0 } = delete $size_dups->{0}
       if exists $size_dups->{0};
 
    if ( $self->opts->{progress} )
@@ -167,7 +167,7 @@ sub digest_dups
             {
                if ( $cache_size < $max_cache && $size <= $cache_stop )
                {
-                  $digest_cache->{ $data } = $digest = xxhash_hex $data, 0;
+                  $digest_cache->{ $data } = $digest = xxhash64_hex $data, 0;
 
                   $cache_size++;
 
@@ -175,13 +175,13 @@ sub digest_dups
                }
                else
                {
-                  $digest = xxhash_hex $data, 0;
+                  $digest = xxhash64_hex $data, 0;
                }
             }
          }
          else
          {
-            $digest = xxhash_hex $data, 0;
+            $digest = xxhash64_hex $data, 0;
          }
 
          push @{ $digests->{ $digest } }, $file;
